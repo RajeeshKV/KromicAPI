@@ -10,11 +10,12 @@ namespace Kromic.Infrastructure.Cloudinary;
 public sealed class CloudinaryImageService : ICloudinaryImageService
 {
     private readonly CloudinaryDotNet.Cloudinary _cloudinary;
+    private readonly CloudinaryOptions _options;
 
     public CloudinaryImageService(IOptions<CloudinaryOptions> options)
     {
-        var value = options.Value;
-        _cloudinary = new CloudinaryDotNet.Cloudinary(new Account(value.CloudName, value.ApiKey, value.ApiSecret));
+        _options = options.Value;
+        _cloudinary = new CloudinaryDotNet.Cloudinary(new Account(_options.CloudName, _options.ApiKey, _options.ApiSecret));
     }
 
     public async Task<Kromic.Application.Interfaces.ImageUploadResult> UploadAsync(IFormFile file, CancellationToken cancellationToken)
@@ -28,7 +29,7 @@ public sealed class CloudinaryImageService : ICloudinaryImageService
         var result = await _cloudinary.UploadAsync(new ImageUploadParams
         {
             File = new FileDescription(file.FileName, stream),
-            Folder = "kromic/projects",
+            Folder = _options.Folder,
             UseFilename = true,
             UniqueFilename = true,
             Overwrite = false

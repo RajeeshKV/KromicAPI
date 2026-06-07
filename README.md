@@ -23,6 +23,7 @@ Jwt__RefreshTokenDays
 Cloudinary__CloudName
 Cloudinary__ApiKey
 Cloudinary__ApiSecret
+Cloudinary__Folder
 Cors__AllowedOrigins__0
 ```
 

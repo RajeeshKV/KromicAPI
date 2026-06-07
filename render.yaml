@@ -31,5 +31,7 @@ services:
         sync: false
       - key: Cloudinary__ApiSecret
         sync: false
+      - key: Cloudinary__Folder
+        value: kromic/projects
       - key: Cors__AllowedOrigins__0
         sync: false

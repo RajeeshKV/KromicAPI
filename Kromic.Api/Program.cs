@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Microsoft.OpenApi.Models;
 using Kromic.Api.Middleware;
 using Kromic.Infrastructure;
 using Kromic.Infrastructure.Persistence;
@@ -8,7 +9,33 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter a valid JWT access token."
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            []
+        }
+    });
+});
 builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddCors(options =>
@@ -57,6 +84,7 @@ app.UseCors("Frontend");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapGet("/", () => Results.Redirect("/api/health"));
 app.MapControllers();
 
 app.Run();

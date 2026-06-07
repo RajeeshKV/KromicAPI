@@ -41,6 +41,11 @@ using (var scope = app.Services.CreateScope())
     await dbContext.Database.MigrateAsync();
 }
 
+if (args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase))
+{
+    return;
+}
+
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())

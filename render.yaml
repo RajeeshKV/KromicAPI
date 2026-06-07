@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: kromic-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: dotnet Kromic.Api.dll
+    preDeployCommand: chmod +x ./EFMigration.sh && ./EFMigration.sh
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Jwt__Key
+        sync: false
+      - key: Jwt__Issuer
+        value: Kromic
+      - key: Jwt__Audience
+        value: KromicAdmin
+      - key: Jwt__AccessTokenMinutes
+        value: "15"
+      - key: Jwt__RefreshTokenDays
+        value: "30"
+      - key: Cloudinary__CloudName
+        sync: false
+      - key: Cloudinary__ApiKey
+        sync: false
+      - key: Cloudinary__ApiSecret
+        sync: false
+      - key: Cors__AllowedOrigins__0
+        sync: false

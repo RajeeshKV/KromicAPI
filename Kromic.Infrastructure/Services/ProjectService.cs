@@ -39,7 +39,7 @@ public sealed partial class ProjectService(
         dbContext.Projects.Add(project);
         await dbContext.SaveChangesAsync(cancellationToken);
         cache.RemoveProjects();
-        return (await QueryProjects().SingleAsync(x => x.Id == project.Id, cancellationToken));
+        return await QueryProjectById(project.Id).SingleAsync(cancellationToken);
     }
 
     public async Task<ProjectResponse?> UpdateAsync(Guid id, UpsertProjectRequest request, CancellationToken cancellationToken)
@@ -78,7 +78,7 @@ public sealed partial class ProjectService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         cache.RemoveProjects();
-        return await QueryProjects().SingleAsync(x => x.Id == project.Id, cancellationToken);
+        return await QueryProjectById(project.Id).SingleAsync(cancellationToken);
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken)
@@ -101,11 +101,19 @@ public sealed partial class ProjectService(
     }
 
     private IQueryable<ProjectResponse> QueryProjects() =>
-        dbContext.Projects
+        ToProjectResponseQuery(dbContext.Projects
             .AsNoTracking()
             .Where(x => x.IsActive)
             .OrderBy(x => x.DisplayOrder)
-            .ThenByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.CreatedAt));
+
+    private IQueryable<ProjectResponse> QueryProjectById(Guid id) =>
+        ToProjectResponseQuery(dbContext.Projects
+            .AsNoTracking()
+            .Where(x => x.Id == id));
+
+    private static IQueryable<ProjectResponse> ToProjectResponseQuery(IQueryable<Project> query) =>
+        query
             .Select(x => new ProjectResponse(
                 x.Id,
                 x.Name,

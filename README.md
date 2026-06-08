@@ -24,7 +24,7 @@ Cloudinary__CloudName
 Cloudinary__ApiKey
 Cloudinary__ApiSecret
 Cloudinary__Folder
-Cors__AllowedOrigins__0
+Cors__AllowedOrigins
 ```
 
 ## Run Locally
@@ -45,3 +45,9 @@ Render deployment files are included:
 - `EFMigration.sh` runs EF Core migrations during Render pre-deploy.
 
 Configure the `sync: false` variables in Render before the first deploy.
+
+Set `Cors__AllowedOrigins` as a comma-separated list when more than one frontend URL is allowed:
+
+```text
+https://kromic.com,https://www.kromic.com,https://admin.kromic.com
+```

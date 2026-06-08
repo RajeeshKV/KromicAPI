@@ -38,10 +38,11 @@ builder.Services.AddSwaggerGen(options =>
 });
 builder.Services.AddInfrastructure(builder.Configuration);
 
+var allowedOrigins = GetAllowedOrigins(builder.Configuration);
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
-        policy.WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? ["http://localhost:3000"])
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials());
@@ -88,3 +89,17 @@ app.MapGet("/", () => Results.Redirect("/api/health"));
 app.MapControllers();
 
 app.Run();
+
+static string[] GetAllowedOrigins(IConfiguration configuration)
+{
+    var indexedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+    var csvOrigins = configuration["Cors:AllowedOriginsCsv"] ?? configuration["Cors:AllowedOrigins"];
+
+    var origins = indexedOrigins
+        .Concat((csvOrigins ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        .Where(origin => !string.IsNullOrWhiteSpace(origin))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    return origins.Length > 0 ? origins : ["http://localhost:3000"];
+}

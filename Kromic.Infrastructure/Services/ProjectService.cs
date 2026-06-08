@@ -46,7 +46,6 @@ public sealed partial class ProjectService(
     {
         var project = await dbContext.Projects
             .Include(x => x.ProjectTools)
-            .Include(x => x.Images)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (project is null)
@@ -65,18 +64,19 @@ public sealed partial class ProjectService(
         dbContext.ProjectTools.RemoveRange(project.ProjectTools);
         await ApplyToolsAsync(project, request.Tools, cancellationToken);
 
+        var replacedCloudinaryIds = Array.Empty<string>();
         if (request.Images.Count > 0)
         {
-            foreach (var image in project.Images)
-            {
-                await imageService.DeleteAsync(image.CloudinaryPublicId, cancellationToken);
-            }
-
-            dbContext.ProjectImages.RemoveRange(project.Images);
-            await AddImagesAsync(project, request.Images, cancellationToken);
+            replacedCloudinaryIds = await ReplaceImagesAsync(project.Id, request.Images, cancellationToken);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        foreach (var publicId in replacedCloudinaryIds)
+        {
+            await imageService.DeleteAsync(publicId, cancellationToken);
+        }
+
         cache.RemoveProjects();
         return await QueryProjectById(project.Id).SingleAsync(cancellationToken);
     }
@@ -154,6 +154,43 @@ public sealed partial class ProjectService(
                 ImageUrl = upload.Url,
                 DisplayOrder = i
             });
+        }
+    }
+
+    private async Task<string[]> ReplaceImagesAsync(Guid projectId, IReadOnlyList<Microsoft.AspNetCore.Http.IFormFile> images, CancellationToken cancellationToken)
+    {
+        var existingImages = await dbContext.ProjectImages
+            .Where(x => x.ProjectId == projectId)
+            .ToListAsync(cancellationToken);
+
+        var uploadedImages = new List<ProjectImage>();
+
+        try
+        {
+            for (var i = 0; i < images.Count; i++)
+            {
+                var upload = await imageService.UploadAsync(images[i], cancellationToken);
+                uploadedImages.Add(new ProjectImage
+                {
+                    ProjectId = projectId,
+                    CloudinaryPublicId = upload.PublicId,
+                    ImageUrl = upload.Url,
+                    DisplayOrder = i
+                });
+            }
+
+            dbContext.ProjectImages.RemoveRange(existingImages);
+            dbContext.ProjectImages.AddRange(uploadedImages);
+            return existingImages.Select(x => x.CloudinaryPublicId).ToArray();
+        }
+        catch
+        {
+            foreach (var uploadedImage in uploadedImages)
+            {
+                await imageService.DeleteAsync(uploadedImage.CloudinaryPublicId, cancellationToken);
+            }
+
+            throw;
         }
     }
 

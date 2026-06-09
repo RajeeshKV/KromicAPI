@@ -10,4 +10,5 @@ public sealed class BrevoOptions
     public string OwnerName { get; set; } = "Kromic Admin";
     public int ContactNotificationTemplateId { get; set; }
     public int ContactResponseTemplateId { get; set; }
+    public int CustomEmailTemplateId { get; set; }
 }

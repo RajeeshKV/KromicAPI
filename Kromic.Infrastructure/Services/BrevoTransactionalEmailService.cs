@@ -13,7 +13,7 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
 
     public Task<string?> SendContactNotificationAsync(ContactSubmission submission, CancellationToken cancellationToken)
     {
-        EnsureConfigured(_options.ContactNotificationTemplateId);
+        EnsureConfigured(_options.ContactNotificationTemplateId, requireOwnerEmail: true);
 
         var request = CreateTemplateRequest(
             _options.OwnerEmail,
@@ -58,6 +58,38 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
         return SendAsync(request, cancellationToken);
     }
 
+    public Task<string?> SendCustomEmailAsync(
+        string toEmail,
+        string toName,
+        string subject,
+        string? heading,
+        string body,
+        string? callToActionText,
+        string? callToActionUrl,
+        CancellationToken cancellationToken)
+    {
+        EnsureConfigured(_options.CustomEmailTemplateId);
+
+        var request = CreateTemplateRequest(
+            toEmail,
+            toName,
+            _options.CustomEmailTemplateId,
+            new
+            {
+                name = toName,
+                email = toEmail,
+                subject,
+                heading,
+                body,
+                callToActionText,
+                callToActionUrl,
+                sentAt = DateTimeOffset.UtcNow
+            },
+            subject: subject);
+
+        return SendAsync(request, cancellationToken);
+    }
+
     private async Task<string?> SendAsync(BrevoSendEmailRequest request, CancellationToken cancellationToken)
     {
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "smtp/email")
@@ -84,6 +116,7 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
         string toName,
         int templateId,
         object parameters,
+        string? subject = null,
         string? replyToEmail = null,
         string? replyToName = null)
     {
@@ -92,7 +125,8 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
             Sender = new BrevoEmailAddress(_options.SenderEmail, _options.SenderName),
             To = [new BrevoEmailAddress(toEmail, toName)],
             TemplateId = templateId,
-            Params = parameters
+            Params = parameters,
+            Subject = subject
         };
 
         if (!string.IsNullOrWhiteSpace(replyToEmail))
@@ -103,11 +137,11 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
         return request;
     }
 
-    private void EnsureConfigured(int templateId)
+    private void EnsureConfigured(int templateId, bool requireOwnerEmail = false)
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKey) ||
             string.IsNullOrWhiteSpace(_options.SenderEmail) ||
-            string.IsNullOrWhiteSpace(_options.OwnerEmail) ||
+            (requireOwnerEmail && string.IsNullOrWhiteSpace(_options.OwnerEmail)) ||
             templateId <= 0)
         {
             throw new InvalidOperationException("Brevo email configuration is incomplete.");
@@ -127,6 +161,9 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
 
         [JsonPropertyName("templateId")]
         public int TemplateId { get; set; }
+
+        [JsonPropertyName("subject")]
+        public string? Subject { get; set; }
 
         [JsonPropertyName("params")]
         public object Params { get; set; } = new();

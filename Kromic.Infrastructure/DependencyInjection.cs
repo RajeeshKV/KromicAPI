@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<ICompanyService, CompanyService>();
         services.AddScoped<IContactService, ContactService>();
+        services.AddScoped<ICustomEmailService, CustomEmailService>();
         services.AddScoped<ICloudinaryImageService, CloudinaryImageService>();
         services.AddSingleton<IPortfolioCache, MemoryPortfolioCache>();
         services.AddHttpClient<ITransactionalEmailService, BrevoTransactionalEmailService>((serviceProvider, client) =>

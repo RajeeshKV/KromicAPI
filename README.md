@@ -32,6 +32,7 @@ Brevo__OwnerEmail
 Brevo__OwnerName
 Brevo__ContactNotificationTemplateId
 Brevo__ContactResponseTemplateId
+Brevo__CustomEmailTemplateId
 Cors__AllowedOrigins
 ```
 

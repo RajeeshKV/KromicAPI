@@ -64,18 +64,12 @@ public sealed partial class ProjectService(
         dbContext.ProjectTools.RemoveRange(project.ProjectTools);
         await ApplyToolsAsync(project, request.Tools, cancellationToken);
 
-        var replacedCloudinaryIds = Array.Empty<string>();
         if (request.Images.Count > 0)
         {
-            replacedCloudinaryIds = await ReplaceImagesAsync(project.Id, request.Images, cancellationToken);
+            await AddImagesToProjectAsync(project.Id, request.Images, cancellationToken);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-
-        foreach (var publicId in replacedCloudinaryIds)
-        {
-            await imageService.DeleteAsync(publicId, cancellationToken);
-        }
 
         cache.RemoveProjects();
         return await QueryProjectById(project.Id).SingleAsync(cancellationToken);
@@ -157,11 +151,12 @@ public sealed partial class ProjectService(
         }
     }
 
-    private async Task<string[]> ReplaceImagesAsync(Guid projectId, IReadOnlyList<Microsoft.AspNetCore.Http.IFormFile> images, CancellationToken cancellationToken)
+    private async Task AddImagesToProjectAsync(Guid projectId, IReadOnlyList<Microsoft.AspNetCore.Http.IFormFile> images, CancellationToken cancellationToken)
     {
-        var existingImages = await dbContext.ProjectImages
+        var nextDisplayOrder = await dbContext.ProjectImages
             .Where(x => x.ProjectId == projectId)
-            .ToListAsync(cancellationToken);
+            .Select(x => (int?)x.DisplayOrder)
+            .MaxAsync(cancellationToken) + 1 ?? 0;
 
         var uploadedImages = new List<ProjectImage>();
 
@@ -175,13 +170,11 @@ public sealed partial class ProjectService(
                     ProjectId = projectId,
                     CloudinaryPublicId = upload.PublicId,
                     ImageUrl = upload.Url,
-                    DisplayOrder = i
+                    DisplayOrder = nextDisplayOrder + i
                 });
             }
 
-            dbContext.ProjectImages.RemoveRange(existingImages);
             dbContext.ProjectImages.AddRange(uploadedImages);
-            return existingImages.Select(x => x.CloudinaryPublicId).ToArray();
         }
         catch
         {

@@ -20,6 +20,7 @@ public static class DependencyInjection
     {
         services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
         services.Configure<CloudinaryOptions>(configuration.GetSection("Cloudinary"));
+        services.Configure<BrevoOptions>(configuration.GetSection("Brevo"));
 
         services.AddDbContext<KromicDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
@@ -28,8 +29,14 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<ICompanyService, CompanyService>();
+        services.AddScoped<IContactService, ContactService>();
         services.AddScoped<ICloudinaryImageService, CloudinaryImageService>();
         services.AddSingleton<IPortfolioCache, MemoryPortfolioCache>();
+        services.AddHttpClient<ITransactionalEmailService, BrevoTransactionalEmailService>((serviceProvider, client) =>
+        {
+            var brevo = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<BrevoOptions>>().Value;
+            client.BaseAddress = new Uri(brevo.BaseUrl.TrimEnd('/') + "/");
+        });
 
         var jwt = configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

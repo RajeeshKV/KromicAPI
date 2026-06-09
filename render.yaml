@@ -33,5 +33,21 @@ services:
         sync: false
       - key: Cloudinary__Folder
         value: kromic/projects
+      - key: Brevo__BaseUrl
+        value: https://api.brevo.com/v3
+      - key: Brevo__ApiKey
+        sync: false
+      - key: Brevo__SenderEmail
+        sync: false
+      - key: Brevo__SenderName
+        value: Kromic
+      - key: Brevo__OwnerEmail
+        sync: false
+      - key: Brevo__OwnerName
+        value: Kromic Admin
+      - key: Brevo__ContactNotificationTemplateId
+        sync: false
+      - key: Brevo__ContactResponseTemplateId
+        sync: false
       - key: Cors__AllowedOrigins
         sync: false

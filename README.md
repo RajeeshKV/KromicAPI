@@ -24,6 +24,14 @@ Cloudinary__CloudName
 Cloudinary__ApiKey
 Cloudinary__ApiSecret
 Cloudinary__Folder
+Brevo__BaseUrl
+Brevo__ApiKey
+Brevo__SenderEmail
+Brevo__SenderName
+Brevo__OwnerEmail
+Brevo__OwnerName
+Brevo__ContactNotificationTemplateId
+Brevo__ContactResponseTemplateId
 Cors__AllowedOrigins
 ```
 

@@ -12,6 +12,7 @@ public sealed class KromicDbContext(DbContextOptions<KromicDbContext> options) :
     public DbSet<Tool> Tools => Set<Tool>();
     public DbSet<ProjectTool> ProjectTools => Set<ProjectTool>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
+    public DbSet<ContactSubmission> ContactSubmissions => Set<ContactSubmission>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,5 +47,21 @@ public sealed class KromicDbContext(DbContextOptions<KromicDbContext> options) :
         modelBuilder.Entity<ProjectTool>().HasKey(x => new { x.ProjectId, x.ToolId });
         modelBuilder.Entity<ProjectTool>().HasOne(x => x.Project).WithMany(x => x.ProjectTools).HasForeignKey(x => x.ProjectId);
         modelBuilder.Entity<ProjectTool>().HasOne(x => x.Tool).WithMany(x => x.ProjectTools).HasForeignKey(x => x.ToolId);
+
+        modelBuilder.Entity<ContactSubmission>(entity =>
+        {
+            entity.HasIndex(x => x.CreatedAt);
+            entity.HasIndex(x => x.Status);
+            entity.Property(x => x.Name).HasMaxLength(150);
+            entity.Property(x => x.Email).HasMaxLength(256);
+            entity.Property(x => x.ProjectType).HasMaxLength(50);
+            entity.Property(x => x.ExpectedTimeline).HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(5000);
+            entity.Property(x => x.ResponseText).HasMaxLength(5000);
+            entity.Property(x => x.IpAddress).HasMaxLength(100);
+            entity.Property(x => x.UserAgent).HasMaxLength(500);
+            entity.Property(x => x.OwnerNotificationMessageId).HasMaxLength(200);
+            entity.Property(x => x.ResponseMessageId).HasMaxLength(200);
+        });
     }
 }

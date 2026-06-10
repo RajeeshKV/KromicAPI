@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net.Http.Json;
+using System.Text;
 using Kromic.Application.DTOs;
 using Kromic.Application.Interfaces;
 using Kromic.Application.Options;
@@ -24,7 +25,7 @@ public sealed class GoldRateService(
         bool sendLowestAlert,
         CancellationToken cancellationToken)
     {
-        var source = await httpClient.GetFromJsonAsync<GoldRateApiResponse>(_options.Endpoint, cancellationToken);
+        var source = await FetchLatestGoldRateAsync(cancellationToken);
         if (source?.Success != true || source.Data is null)
         {
             throw new InvalidOperationException(source?.Message ?? "Gold rate endpoint did not return a successful response.");
@@ -63,6 +64,24 @@ public sealed class GoldRateService(
         }
 
         return new GoldRateFetchResponse(ToResponse(snapshot), sendRegularEmail, sendLowestAlert && isLowest);
+    }
+
+    private async Task<GoldRateApiResponse?> FetchLatestGoldRateAsync(CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, _options.Endpoint)
+        {
+            Content = new StringContent("{}", Encoding.UTF8, "application/json")
+        };
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Gold rate endpoint failed with {(int)response.StatusCode} {response.ReasonPhrase}. Response: {responseBody}");
+        }
+
+        return await response.Content.ReadFromJsonAsync<GoldRateApiResponse>(cancellationToken);
     }
 
     public async Task<GoldRateSnapshotResponse?> GetCurrentAsync(CancellationToken cancellationToken)

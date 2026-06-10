@@ -8,12 +8,17 @@ using Kromic.Application.Options;
 using Kromic.Domain.Entities;
 using Kromic.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Kromic.Infrastructure.Authentication;
 
-public sealed class AuthService(KromicDbContext dbContext, IOptions<JwtOptions> jwtOptions) : IAuthService
+public sealed class AuthService(
+    KromicDbContext dbContext,
+    IOptions<JwtOptions> jwtOptions,
+    IGoldRateService goldRateService,
+    ILogger<AuthService> logger) : IAuthService
 {
     private readonly JwtOptions _jwt = jwtOptions.Value;
 
@@ -47,7 +52,8 @@ public sealed class AuthService(KromicDbContext dbContext, IOptions<JwtOptions> 
             throw new UnauthorizedAccessException("Invalid username/email or password.");
         }
 
-        return await IssueTokenPairAsync(admin, cancellationToken);
+        var goldRate = await RefreshGoldRateForLoginAsync(cancellationToken);
+        return await IssueTokenPairAsync(admin, goldRate, cancellationToken);
     }
 
     public async Task<TokenResponse> RefreshAsync(RefreshTokenRequest request, CancellationToken cancellationToken)
@@ -63,7 +69,7 @@ public sealed class AuthService(KromicDbContext dbContext, IOptions<JwtOptions> 
         }
 
         token.RevokedAt = DateTimeOffset.UtcNow;
-        var response = await IssueTokenPairAsync(token.AdminUser, cancellationToken);
+        var response = await IssueTokenPairAsync(token.AdminUser, goldRate: null, cancellationToken);
         token.ReplacedByTokenHash = HashToken(response.RefreshToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         return response;
@@ -81,7 +87,10 @@ public sealed class AuthService(KromicDbContext dbContext, IOptions<JwtOptions> 
         }
     }
 
-    private async Task<TokenResponse> IssueTokenPairAsync(AdminUser admin, CancellationToken cancellationToken)
+    private async Task<TokenResponse> IssueTokenPairAsync(
+        AdminUser admin,
+        GoldRateSnapshotResponse? goldRate,
+        CancellationToken cancellationToken)
     {
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(_jwt.AccessTokenMinutes);
         var accessToken = CreateAccessToken(admin, expiresAt);
@@ -95,7 +104,25 @@ public sealed class AuthService(KromicDbContext dbContext, IOptions<JwtOptions> 
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new TokenResponse(accessToken, refreshToken, _jwt.AccessTokenMinutes * 60);
+        return new TokenResponse(accessToken, refreshToken, _jwt.AccessTokenMinutes * 60, goldRate);
+    }
+
+    private async Task<GoldRateSnapshotResponse?> RefreshGoldRateForLoginAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await goldRateService.FetchAndStoreAsync(
+                sendRegularEmail: false,
+                sendLowestAlert: true,
+                cancellationToken);
+
+            return result.Snapshot;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Gold rate refresh during admin login failed.");
+            return await goldRateService.GetCurrentAsync(cancellationToken);
+        }
     }
 
     private string CreateAccessToken(AdminUser admin, DateTimeOffset expiresAt)

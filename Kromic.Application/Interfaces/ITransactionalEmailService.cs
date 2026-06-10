@@ -15,4 +15,9 @@ public interface ITransactionalEmailService
         string? callToActionText,
         string? callToActionUrl,
         CancellationToken cancellationToken);
+    Task<string?> SendAdminNotificationAsync(
+        string subject,
+        string heading,
+        string body,
+        CancellationToken cancellationToken);
 }

@@ -13,6 +13,7 @@ public sealed class KromicDbContext(DbContextOptions<KromicDbContext> options) :
     public DbSet<ProjectTool> ProjectTools => Set<ProjectTool>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
     public DbSet<ContactSubmission> ContactSubmissions => Set<ContactSubmission>();
+    public DbSet<GoldRateSnapshot> GoldRateSnapshots => Set<GoldRateSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -62,6 +63,17 @@ public sealed class KromicDbContext(DbContextOptions<KromicDbContext> options) :
             entity.Property(x => x.UserAgent).HasMaxLength(500);
             entity.Property(x => x.OwnerNotificationMessageId).HasMaxLength(200);
             entity.Property(x => x.ResponseMessageId).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<GoldRateSnapshot>(entity =>
+        {
+            entity.HasIndex(x => x.FetchedAt);
+            entity.HasIndex(x => x.R22KT);
+            entity.Property(x => x.R22KT).HasPrecision(18, 2);
+            entity.Property(x => x.R18KT).HasPrecision(18, 2);
+            entity.Property(x => x.R24KT).HasPrecision(18, 2);
+            entity.Property(x => x.RegularEmailMessageId).HasMaxLength(200);
+            entity.Property(x => x.LowestAlertMessageId).HasMaxLength(200);
         });
     }
 }

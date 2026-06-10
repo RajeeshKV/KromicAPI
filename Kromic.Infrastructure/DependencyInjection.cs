@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
         services.Configure<CloudinaryOptions>(configuration.GetSection("Cloudinary"));
         services.Configure<BrevoOptions>(configuration.GetSection("Brevo"));
+        services.Configure<GoldRateOptions>(configuration.GetSection("GoldRate"));
 
         services.AddDbContext<KromicDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
@@ -33,6 +34,8 @@ public static class DependencyInjection
         services.AddScoped<ICustomEmailService, CustomEmailService>();
         services.AddScoped<ICloudinaryImageService, CloudinaryImageService>();
         services.AddSingleton<IPortfolioCache, MemoryPortfolioCache>();
+        services.AddHostedService<GoldRateDailyWorker>();
+        services.AddHttpClient<IGoldRateService, GoldRateService>();
         services.AddHttpClient<ITransactionalEmailService, BrevoTransactionalEmailService>((serviceProvider, client) =>
         {
             var brevo = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<BrevoOptions>>().Value;

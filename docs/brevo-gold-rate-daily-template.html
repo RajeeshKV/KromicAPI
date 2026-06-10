@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>{{ params.subject }}</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #f4f7f6;
+        color: #17201d;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      table {
+        border-collapse: collapse;
+      }
+
+      .wrapper {
+        width: 100%;
+        background: #f4f7f6;
+        padding: 28px 12px;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 640px;
+        margin: 0 auto;
+        background: #ffffff;
+        border: 1px solid #dce5e1;
+      }
+
+      .header {
+        padding: 28px 32px 18px;
+        background: #173f35;
+        color: #ffffff;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: #bfe2d6;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 26px;
+        line-height: 1.25;
+        font-weight: 700;
+      }
+
+      .content {
+        padding: 30px 32px 32px;
+      }
+
+      .rate-card {
+        margin: 0 0 24px;
+        border: 1px solid #d9e4de;
+        background: #fbfdfc;
+      }
+
+      .rate-label {
+        padding: 16px 20px 0;
+        color: #5d6f68;
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .rate-value {
+        padding: 6px 20px 18px;
+        color: #0f2f28;
+        font-size: 34px;
+        line-height: 1.15;
+        font-weight: 700;
+      }
+
+      .body-text {
+        margin: 0;
+        color: #26332f;
+        font-size: 15px;
+        line-height: 1.7;
+        white-space: pre-line;
+      }
+
+      .footer {
+        padding: 18px 32px 28px;
+        color: #6a7772;
+        font-size: 12px;
+        line-height: 1.6;
+        background: #f8faf9;
+        border-top: 1px solid #e5ece8;
+      }
+
+      @media screen and (max-width: 520px) {
+        .header,
+        .content,
+        .footer {
+          padding-left: 20px;
+          padding-right: 20px;
+        }
+
+        .title {
+          font-size: 22px;
+        }
+
+        .rate-value {
+          font-size: 30px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+      Daily R22KT gold rate update from Kromic Admin.
+    </div>
+
+    <table role="presentation" class="wrapper" width="100%">
+      <tr>
+        <td align="center">
+          <table role="presentation" class="container" width="100%">
+            <tr>
+              <td class="header">
+                <p class="eyebrow">Daily gold rate</p>
+                <h1 class="title">{{ params.heading }}</h1>
+              </td>
+            </tr>
+            <tr>
+              <td class="content">
+                <table role="presentation" class="rate-card" width="100%">
+                  <tr>
+                    <td class="rate-label">Focused rate</td>
+                  </tr>
+                  <tr>
+                    <td class="rate-value">R22KT</td>
+                  </tr>
+                </table>
+
+                <p class="body-text">{{ params.body }}</p>
+              </td>
+            </tr>
+            <tr>
+              <td class="footer">
+                This automated message was sent to {{ params.email }} for {{ params.name }}.
+                <br>
+                Sent at: {{ params.sentAt }}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -90,6 +90,32 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
         return SendAsync(request, cancellationToken);
     }
 
+    public Task<string?> SendAdminNotificationAsync(
+        string subject,
+        string heading,
+        string body,
+        CancellationToken cancellationToken)
+    {
+        EnsureConfigured(_options.CustomEmailTemplateId, requireOwnerEmail: true);
+
+        var request = CreateTemplateRequest(
+            _options.OwnerEmail,
+            _options.OwnerName,
+            _options.CustomEmailTemplateId,
+            new
+            {
+                name = _options.OwnerName,
+                email = _options.OwnerEmail,
+                subject,
+                heading,
+                body,
+                sentAt = DateTimeOffset.UtcNow
+            },
+            subject: subject);
+
+        return SendAsync(request, cancellationToken);
+    }
+
     private async Task<string?> SendAsync(BrevoSendEmailRequest request, CancellationToken cancellationToken)
     {
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "smtp/email")

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>{{ params.subject }}</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #f6f1e5;
+        color: #211c12;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      table {
+        border-collapse: collapse;
+      }
+
+      .wrapper {
+        width: 100%;
+        background: #f6f1e5;
+        padding: 28px 12px;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 640px;
+        margin: 0 auto;
+        background: #ffffff;
+        border: 1px solid #e5d6b9;
+      }
+
+      .header {
+        padding: 30px 32px 20px;
+        background: #3b2a12;
+        color: #ffffff;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: #f4cf78;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 28px;
+        line-height: 1.25;
+        font-weight: 700;
+      }
+
+      .content {
+        padding: 30px 32px 32px;
+      }
+
+      .alert-card {
+        margin: 0 0 24px;
+        border: 2px solid #d6a941;
+        background: #fff9e9;
+      }
+
+      .alert-label {
+        padding: 18px 20px 0;
+        color: #7b5b13;
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .alert-value {
+        padding: 8px 20px 6px;
+        color: #2f210d;
+        font-size: 32px;
+        line-height: 1.15;
+        font-weight: 700;
+      }
+
+      .alert-note {
+        padding: 0 20px 18px;
+        color: #5c4314;
+        font-size: 15px;
+        line-height: 1.5;
+        font-weight: 700;
+      }
+
+      .body-text {
+        margin: 0;
+        color: #30291d;
+        font-size: 15px;
+        line-height: 1.7;
+        white-space: pre-line;
+      }
+
+      .footer {
+        padding: 18px 32px 28px;
+        color: #756b5b;
+        font-size: 12px;
+        line-height: 1.6;
+        background: #fbf7ed;
+        border-top: 1px solid #eadfc9;
+      }
+
+      @media screen and (max-width: 520px) {
+        .header,
+        .content,
+        .footer {
+          padding-left: 20px;
+          padding-right: 20px;
+        }
+
+        .title {
+          font-size: 23px;
+        }
+
+        .alert-value {
+          font-size: 28px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+      Lowest saved R22KT gold rate found. Buy gold now.
+    </div>
+
+    <table role="presentation" class="wrapper" width="100%">
+      <tr>
+        <td align="center">
+          <table role="presentation" class="container" width="100%">
+            <tr>
+              <td class="header">
+                <p class="eyebrow">Lowest rate alert</p>
+                <h1 class="title">{{ params.heading }}</h1>
+              </td>
+            </tr>
+            <tr>
+              <td class="content">
+                <table role="presentation" class="alert-card" width="100%">
+                  <tr>
+                    <td class="alert-label">Action signal</td>
+                  </tr>
+                  <tr>
+                    <td class="alert-value">R22KT is at the lowest saved rate</td>
+                  </tr>
+                  <tr>
+                    <td class="alert-note">Buy gold now.</td>
+                  </tr>
+                </table>
+
+                <p class="body-text">{{ params.body }}</p>
+              </td>
+            </tr>
+            <tr>
+              <td class="footer">
+                This automated alert was sent to {{ params.email }} for {{ params.name }}.
+                <br>
+                Sent at: {{ params.sentAt }}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

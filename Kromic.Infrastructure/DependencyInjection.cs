@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IContactService, ContactService>();
         services.AddScoped<ICustomEmailService, CustomEmailService>();
         services.AddScoped<ICloudinaryImageService, CloudinaryImageService>();
+        services.AddScoped<ITelegramUserService, TelegramUserService>();
         services.AddSingleton<IPortfolioCache, MemoryPortfolioCache>();
         services.AddHostedService<GoldRateDailyWorker>();
         services.AddHttpClient<IGoldRateService, GoldRateService>();

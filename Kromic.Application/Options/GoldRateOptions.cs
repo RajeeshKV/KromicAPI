@@ -11,4 +11,5 @@ public sealed class GoldRateOptions
     public string TelegramBotToken { get; set; } = string.Empty;
     public string TelegramChatIdsCsv { get; set; } = string.Empty;
     public List<string> TelegramChatIds { get; set; } = [];
+    public string TelegramWebhookSecret { get; set; } = string.Empty;
 }

@@ -8,6 +8,7 @@ namespace Kromic.Infrastructure.Services;
 
 public sealed class TelegramService(
     HttpClient httpClient,
+    ITelegramUserService telegramUserService,
     IOptions<GoldRateOptions> options,
     ILogger<TelegramService> logger) : ITelegramService
 {
@@ -23,45 +24,34 @@ public sealed class TelegramService(
             return false;
         }
 
-        var chatIds = ResolveChatIds();
-        if (chatIds.Count == 0)
+        // Get chat IDs from database (users who have interacted with the bot)
+        var chatIds = await telegramUserService.GetActiveChatIdsAsync(cancellationToken);
+        
+        // Also include configured chat IDs from environment variables
+        var configuredChatIds = ResolveChatIds();
+        
+        // Combine and deduplicate
+        var allChatIds = new HashSet<string>(chatIds);
+        foreach (var id in configuredChatIds)
         {
-            logger.LogWarning("No Telegram chat IDs configured.");
+            allChatIds.Add(id);
+        }
+
+        if (allChatIds.Count == 0)
+        {
+            logger.LogWarning("No Telegram chat IDs found in database or configuration.");
             return false;
         }
 
         var successCount = 0;
         var failureCount = 0;
 
-        foreach (var chatId in chatIds)
+        foreach (var chatId in allChatIds)
         {
             try
             {
-                var payload = new
-                {
-                    chat_id = chatId,
-                    text = message,
-                    parse_mode = "HTML"
-                };
-
-                var url = $"https://api.telegram.org/bot{_options.TelegramBotToken}/sendMessage";
-                using var response = await httpClient.PostAsJsonAsync(url, payload, cancellationToken);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    successCount++;
-                    logger.LogInformation("Telegram message sent successfully to chat ID: {ChatId}", chatId);
-                }
-                else
-                {
-                    failureCount++;
-                    var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                    logger.LogWarning(
-                        "Failed to send Telegram message to chat ID {ChatId}. Status: {StatusCode}. Error: {Error}",
-                        chatId,
-                        response.StatusCode,
-                        errorContent);
-                }
+                await SendMessageToTelegramAsync(chatId, message, cancellationToken);
+                successCount++;
             }
             catch (Exception ex)
             {
@@ -71,11 +61,65 @@ public sealed class TelegramService(
         }
 
         logger.LogInformation(
-            "Telegram message dispatch completed. Successful: {SuccessCount}, Failed: {FailureCount}",
+            "Telegram message dispatch completed. Total: {Total}, Successful: {SuccessCount}, Failed: {FailureCount}",
+            allChatIds.Count,
             successCount,
             failureCount);
 
         return successCount > 0;
+    }
+
+    public async Task<bool> SendMessageToChatIdAsync(
+        string chatId,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_options.TelegramBotToken))
+        {
+            logger.LogWarning("Telegram bot token is not configured.");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(chatId))
+        {
+            logger.LogWarning("Chat ID is empty.");
+            return false;
+        }
+
+        try
+        {
+            await SendMessageToTelegramAsync(chatId, message, cancellationToken);
+            logger.LogInformation("Telegram message sent successfully to chat ID: {ChatId}", chatId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to send Telegram message to chat ID: {ChatId}", chatId);
+            return false;
+        }
+    }
+
+    private async Task SendMessageToTelegramAsync(
+        string chatId,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        var payload = new
+        {
+            chat_id = chatId,
+            text = message,
+            parse_mode = "HTML"
+        };
+
+        var url = $"https://api.telegram.org/bot{_options.TelegramBotToken}/sendMessage";
+        using var response = await httpClient.PostAsJsonAsync(url, payload, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Telegram API returned {(int)response.StatusCode} {response.ReasonPhrase}. Error: {errorContent}");
+        }
     }
 
     private List<string> ResolveChatIds()

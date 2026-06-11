@@ -16,6 +16,7 @@ public sealed class GoldRateService(
     KromicDbContext dbContext,
     ITransactionalEmailService emailService,
     ITelegramService telegramService,
+    ITelegramUserService telegramUserService,
     IOptions<GoldRateOptions> options) : IGoldRateService
 {
     private static readonly TimeSpan IndiaOffset = TimeSpan.FromHours(5.5);
@@ -51,6 +52,9 @@ public sealed class GoldRateService(
 
         dbContext.GoldRateSnapshots.Add(snapshot);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // Sync any new Telegram users from configured environment
+        await SyncConfiguredTelegramUsersAsync(cancellationToken);
 
         if (sendRegularEmail)
         {
@@ -140,13 +144,13 @@ public sealed class GoldRateService(
     {
         var istFetchedAt = TimeZoneInfo.ConvertTime(snapshot.FetchedAt, GetIndiaTimeZone());
         var subject = isLowestAlert
-            ? $"Lowest gold rate found: R22KT {snapshot.R22KT:N2}"
-            : $"Today's gold rate: R22KT {snapshot.R22KT:N2}";
+            ? $"Lowest gold rate found: 22K {snapshot.R22KT:N2}"
+            : $"Today's gold rate: 22K {snapshot.R22KT:N2}";
         var heading = isLowestAlert
-            ? "This is the lowest saved R22KT rate. Buy gold now."
-            : "Today's R22KT gold rate";
+            ? "This is the lowest saved 22K rate. Buy gold now."
+            : "Today's 22K gold rate";
         var body = string.Join(Environment.NewLine, [
-            $"R22KT: {snapshot.R22KT:N2}",
+            $"22K Gold Rate: {snapshot.R22KT:N2}",
             $"Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST",
             snapshot.SourceLastUpdatedAt.HasValue
                 ? $"Source updated at: {TimeZoneInfo.ConvertTime(snapshot.SourceLastUpdatedAt.Value, GetIndiaTimeZone()):dd MMM yyyy, hh:mm tt} IST"
@@ -189,13 +193,48 @@ public sealed class GoldRateService(
         var istFetchedAt = TimeZoneInfo.ConvertTime(snapshot.FetchedAt, GetIndiaTimeZone());
         var message = isLowestAlert
             ? $"<b>🚨 Lowest Gold Rate Found!</b>\n\n" +
-              $"<b>R22KT:</b> ₹{snapshot.R22KT:N2}\n" +
+              $"<b>22K Gold Rate:</b> ₹{snapshot.R22KT:N2}\n" +
               $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>"
             : $"<b>📈 Today's Gold Rate</b>\n\n" +
-              $"<b>R22KT:</b> ₹{snapshot.R22KT:N2}\n" +
+              $"<b>22K Gold Rate:</b> ₹{snapshot.R22KT:N2}\n" +
               $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
 
         await telegramService.SendMessageAsync(message, cancellationToken);
+    }
+
+    private async Task SyncConfiguredTelegramUsersAsync(CancellationToken cancellationToken)
+    {
+        // Add configured chat IDs to database if they're not already there
+        var configuredChatIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var chatId in _options.TelegramChatIds)
+        {
+            var trimmed = chatId?.Trim();
+            if (!string.IsNullOrWhiteSpace(trimmed))
+            {
+                configuredChatIds.Add(trimmed);
+            }
+        }
+
+        foreach (var chatId in _options.TelegramChatIdsCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var trimmed = chatId?.Trim();
+            if (!string.IsNullOrWhiteSpace(trimmed))
+            {
+                configuredChatIds.Add(trimmed);
+            }
+        }
+
+        // Ensure all configured chat IDs are in the database
+        foreach (var chatId in configuredChatIds)
+        {
+            await telegramUserService.AddOrUpdateUserAsync(
+                chatId,
+                "Configured User",
+                null,
+                null,
+                cancellationToken);
+        }
     }
 
     private List<string> ResolveRecipients()

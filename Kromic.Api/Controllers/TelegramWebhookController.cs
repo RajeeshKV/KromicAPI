@@ -47,11 +47,8 @@ public sealed class TelegramWebhookController(
                     $"{firstName} {lastName}".Trim(),
                     username);
 
-                // Send latest gold rate to new users
-                if (isNewUser)
-                {
-                    await SendLatestRateToUserAsync(chatId, cancellationToken);
-                }
+                // Send current gold rate to ALL users who send a message
+                await SendLatestRateToUserAsync(chatId, cancellationToken, isNewUser);
             }
 
             // Handle user joining/leaving via my_chat_member
@@ -79,11 +76,8 @@ public sealed class TelegramWebhookController(
                         chatId,
                         status);
 
-                    // Send latest gold rate to new users
-                    if (isNewUser)
-                    {
-                        await SendLatestRateToUserAsync(chatId, cancellationToken);
-                    }
+                    // Send current gold rate to users who join
+                    await SendLatestRateToUserAsync(chatId, cancellationToken, isNewUser);
                 }
                 else if (status == "left" || status == "kicked")
                 {
@@ -110,30 +104,40 @@ public sealed class TelegramWebhookController(
         return Ok(new { activeUsers = count });
     }
 
-    private async Task SendLatestRateToUserAsync(string chatId, CancellationToken cancellationToken)
+    private async Task SendLatestRateToUserAsync(string chatId, CancellationToken cancellationToken, bool isNewUser = false)
     {
         try
         {
             var currentRate = await goldRateService.GetCurrentAsync(cancellationToken);
             if (currentRate == null)
             {
-                logger.LogInformation("No gold rate available to send to new user {ChatId}", chatId);
+                logger.LogInformation("No gold rate available to send to user {ChatId}", chatId);
                 return;
             }
 
             var istFetchedAt = TimeZoneInfo.ConvertTime(currentRate.FetchedAt, GetIndiaTimeZone());
-            var message = $"<b>📈 Welcome! Here's the Latest Gold Rate</b>\n\n" +
+            
+            string message;
+            if (isNewUser)
+            {
+                message = $"<b>📈 Welcome! Here's the Latest Gold Rate</b>\n\n" +
                           $"<b>22K Gold Rate:</b> ₹{currentRate.R22KT:N2}\n" +
                           $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>\n\n" +
                           $"<i>You'll receive daily updates at 11:00 AM IST</i>";
+            }
+            else
+            {
+                message = $"<b>📈 Current Gold Rate</b>\n\n" +
+                          $"<b>22K Gold Rate:</b> ₹{currentRate.R22KT:N2}\n" +
+                          $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
+            }
 
             await telegramService.SendMessageToChatIdAsync(chatId, message, cancellationToken);
-            logger.LogInformation("Sent welcome message with latest rate to new user {ChatId}", chatId);
+            logger.LogInformation("Sent gold rate message to user {ChatId}", chatId);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error sending latest rate to new user {ChatId}", chatId);
-            // Don't throw - we already added the user, just couldn't send initial rate
+            logger.LogError(ex, "Error sending rate to user {ChatId}", chatId);
         }
     }
 

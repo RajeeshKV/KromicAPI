@@ -8,4 +8,7 @@ public sealed class GoldRateOptions
     public List<string> RecipientEmails { get; set; } = [];
     public string RecipientName { get; set; } = "Kromic Admin";
     public bool DailyJobEnabled { get; set; } = true;
+    public string TelegramBotToken { get; set; } = string.Empty;
+    public string TelegramChatIdsCsv { get; set; } = string.Empty;
+    public List<string> TelegramChatIds { get; set; } = [];
 }

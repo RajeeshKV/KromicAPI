@@ -15,6 +15,7 @@ public sealed class GoldRateService(
     HttpClient httpClient,
     KromicDbContext dbContext,
     ITransactionalEmailService emailService,
+    ITelegramService telegramService,
     IOptions<GoldRateOptions> options) : IGoldRateService
 {
     private static readonly TimeSpan IndiaOffset = TimeSpan.FromHours(5.5);
@@ -54,12 +55,14 @@ public sealed class GoldRateService(
         if (sendRegularEmail)
         {
             snapshot.RegularEmailMessageId = await SendRateEmailAsync(snapshot, isLowestAlert: false, cancellationToken);
+            await SendRateTelegramAsync(snapshot, isLowestAlert: false, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         if (sendLowestAlert && isLowest)
         {
             snapshot.LowestAlertMessageId = await SendRateEmailAsync(snapshot, isLowestAlert: true, cancellationToken);
+            await SendRateTelegramAsync(snapshot, isLowestAlert: true, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
@@ -176,6 +179,23 @@ public sealed class GoldRateService(
         }
 
         return messageIds.Count == 0 ? null : string.Join(",", messageIds);
+    }
+
+    private async Task SendRateTelegramAsync(
+        GoldRateSnapshot snapshot,
+        bool isLowestAlert,
+        CancellationToken cancellationToken)
+    {
+        var istFetchedAt = TimeZoneInfo.ConvertTime(snapshot.FetchedAt, GetIndiaTimeZone());
+        var message = isLowestAlert
+            ? $"<b>🚨 Lowest Gold Rate Found!</b>\n\n" +
+              $"<b>R22KT:</b> ₹{snapshot.R22KT:N2}\n" +
+              $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>"
+            : $"<b>📈 Today's Gold Rate</b>\n\n" +
+              $"<b>R22KT:</b> ₹{snapshot.R22KT:N2}\n" +
+              $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
+
+        await telegramService.SendMessageAsync(message, cancellationToken);
     }
 
     private List<string> ResolveRecipients()

@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddSingleton<IPortfolioCache, MemoryPortfolioCache>();
         services.AddHostedService<GoldRateDailyWorker>();
         services.AddHttpClient<IGoldRateService, GoldRateService>();
+        services.AddHttpClient<ITelegramService, TelegramService>();
         services.AddHttpClient<ITransactionalEmailService, BrevoTransactionalEmailService>((serviceProvider, client) =>
         {
             var brevo = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<BrevoOptions>>().Value;

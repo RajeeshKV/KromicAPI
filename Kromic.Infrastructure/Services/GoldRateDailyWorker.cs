@@ -59,6 +59,12 @@ public sealed class GoldRateDailyWorker(
             nextRun = nextRun.AddDays(1);
         }
 
+        // Skip Sundays (jewelry doesn't update on Sundays)
+        while (nextRun.DayOfWeek == DayOfWeek.Sunday)
+        {
+            nextRun = nextRun.AddDays(1);
+        }
+
         return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
     }
 

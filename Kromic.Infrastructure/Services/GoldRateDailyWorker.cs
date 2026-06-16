@@ -52,7 +52,7 @@ public sealed class GoldRateDailyWorker(
     {
         var indiaTimeZone = GetIndiaTimeZone();
         var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, indiaTimeZone);
-        var nextRun = new DateTimeOffset(now.Year, now.Month, now.Day, 11, 0, 0, now.Offset);
+        var nextRun = new DateTimeOffset(now.Year, now.Month, now.Day, 10, 0, 0, now.Offset);
 
         if (now >= nextRun)
         {

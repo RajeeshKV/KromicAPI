@@ -142,7 +142,7 @@ public sealed class TelegramWebhookController(
                 message = $"<b>📈 Welcome! Here's the Latest Gold Rate</b>\n\n" +
                           $"<b>22K Gold Rate:</b> ₹{currentRate.R22KT:N2}\n" +
                           $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>\n\n" +
-                          $"<i>You'll receive daily updates at 11:00 AM IST</i>";
+                          $"<i>You'll receive daily updates at 10:00 AM IST</i>";
             }
             else
             {

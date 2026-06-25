@@ -33,6 +33,18 @@ public sealed class GoldRateService(
             throw new InvalidOperationException(source?.Message ?? "Gold rate endpoint did not return a successful response.");
         }
 
+        var fetchedAt = DateTimeOffset.UtcNow;
+        var todayRange = GetIndiaDayRange(fetchedAt);
+        var latestToday = await dbContext.GoldRateSnapshots
+            .Where(x => x.FetchedAt >= todayRange.StartUtc && x.FetchedAt < todayRange.EndUtc)
+            .OrderByDescending(x => x.FetchedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (latestToday is not null && latestToday.R22KT == source.Data.R22KT)
+        {
+            return new GoldRateFetchResponse(ToResponse(latestToday), RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
+        }
+
         var previousLowest = await dbContext.GoldRateSnapshots
             .AsNoTracking()
             .MinAsync(x => (decimal?)x.R22KT, cancellationToken);
@@ -46,7 +58,7 @@ public sealed class GoldRateService(
             R18KT = source.Data.R18KT,
             R24KT = source.Data.R24KT,
             SourceLastUpdatedAt = ParseIndiaDateTime(source.Data.LastUpdated),
-            FetchedAt = DateTimeOffset.UtcNow,
+            FetchedAt = fetchedAt,
             IsLowestAtFetch = isLowest
         };
 
@@ -70,9 +82,8 @@ public sealed class GoldRateService(
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return new GoldRateFetchResponse(ToResponse(snapshot), sendRegularEmail, sendLowestAlert && isLowest);
+        return new GoldRateFetchResponse(ToResponse(snapshot), sendRegularEmail, sendLowestAlert && isLowest, RateChanged: true);
     }
-
     private async Task<GoldRateApiResponse?> FetchLatestGoldRateAsync(CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, _options.Endpoint)
@@ -287,6 +298,13 @@ public sealed class GoldRateService(
         return null;
     }
 
+    private static (DateTimeOffset StartUtc, DateTimeOffset EndUtc) GetIndiaDayRange(DateTimeOffset value)
+    {
+        var indiaTimeZone = GetIndiaTimeZone();
+        var indiaValue = TimeZoneInfo.ConvertTime(value, indiaTimeZone);
+        var start = new DateTimeOffset(indiaValue.Year, indiaValue.Month, indiaValue.Day, 0, 0, 0, indiaValue.Offset).ToUniversalTime();
+        return (start, start.AddDays(1));
+    }
     private static DateTimeOffset? ResolveRangeStart(string? range)
     {
         var now = DateTimeOffset.UtcNow;

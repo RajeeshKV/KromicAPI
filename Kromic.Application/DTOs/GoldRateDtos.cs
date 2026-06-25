@@ -15,7 +15,8 @@ public sealed record GoldRateSnapshotResponse(
 public sealed record GoldRateFetchResponse(
     GoldRateSnapshotResponse Snapshot,
     bool RegularEmailSent,
-    bool LowestAlertSent);
+    bool LowestAlertSent,
+    bool RateChanged);
 
 public sealed record GoldRateHistoryResponse(
     GoldRateSnapshotResponse? Current,

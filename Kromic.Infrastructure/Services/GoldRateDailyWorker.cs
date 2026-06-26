@@ -26,6 +26,7 @@ public sealed class GoldRateDailyWorker(
         {
             var startHour = NormalizeHour(_options.ScheduleStartHour, fallback: 10);
             var endHour = NormalizeHour(_options.ScheduleEndHour, fallback: 20);
+            var intervalMinutes = NormalizeInterval(_options.ScheduleIntervalMinutes, fallback: 5);
             if (endHour < startHour)
             {
                 logger.LogWarning(
@@ -36,12 +37,13 @@ public sealed class GoldRateDailyWorker(
                 endHour = 20;
             }
 
-            var delay = GetDelayUntilNextRun(startHour, endHour);
+            var delay = GetDelayUntilNextRun(startHour, endHour, intervalMinutes);
             logger.LogInformation(
-                "Next gold rate fetch scheduled in {Delay}. Active window: {StartHour}:00-{EndHour}:00 IST.",
+                "Next gold rate fetch scheduled in {Delay}. Active window: {StartHour}:00-{EndHour}:00 IST, interval: {IntervalMinutes} minutes.",
                 delay,
                 startHour,
-                endHour);
+                endHour,
+                intervalMinutes);
             await Task.Delay(delay, stoppingToken);
 
             try
@@ -64,26 +66,59 @@ public sealed class GoldRateDailyWorker(
         }
     }
 
-    private static TimeSpan GetDelayUntilNextRun(int startHour, int endHour)
+    private static TimeSpan GetDelayUntilNextRun(int startHour, int endHour, int intervalMinutes)
     {
         var indiaTimeZone = GetIndiaTimeZone();
         var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, indiaTimeZone);
 
-        for (var hour = startHour; hour <= endHour; hour++)
+        if (now.Hour < startHour)
         {
-            var candidate = new DateTimeOffset(now.Year, now.Month, now.Day, hour, 0, 0, now.Offset);
-            if (candidate > now)
-            {
-                return candidate.ToUniversalTime() - DateTimeOffset.UtcNow;
-            }
+            var nextRun = new DateTimeOffset(now.Year, now.Month, now.Day, startHour, 0, 0, now.Offset);
+            return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
         }
 
-        var nextRun = new DateTimeOffset(now.Year, now.Month, now.Day, startHour, 0, 0, now.Offset).AddDays(1);
-        return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
+        if (now.Hour > endHour)
+        {
+            var nextRun = new DateTimeOffset(now.Year, now.Month, now.Day, startHour, 0, 0, now.Offset).AddDays(1);
+            return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
+        }
+
+        var minuteBlock = now.Minute / intervalMinutes;
+        var nextMinute = (minuteBlock + 1) * intervalMinutes;
+        var candidateHour = now.Hour;
+
+        if (nextMinute >= 60)
+        {
+            candidateHour++;
+            nextMinute = 0;
+        }
+
+        if (candidateHour > endHour)
+        {
+            var nextRun = new DateTimeOffset(now.Year, now.Month, now.Day, startHour, 0, 0, now.Offset).AddDays(1);
+            return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
+        }
+
+        var nextRunCandidate = new DateTimeOffset(now.Year, now.Month, now.Day, candidateHour, nextMinute, 0, now.Offset);
+        if (nextRunCandidate <= now)
+        {
+            nextRunCandidate = nextRunCandidate.AddMinutes(intervalMinutes);
+        }
+
+        if (nextRunCandidate.Hour > endHour || (nextRunCandidate.Hour == endHour && nextRunCandidate.Minute > 0))
+        {
+            var nextRun = new DateTimeOffset(now.Year, now.Month, now.Day, startHour, 0, 0, now.Offset).AddDays(1);
+            return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
+        }
+
+        return nextRunCandidate.ToUniversalTime() - DateTimeOffset.UtcNow;
     }
 
     private static int NormalizeHour(int hour, int fallback) =>
         hour is >= 0 and <= 23 ? hour : fallback;
+
+    private static int NormalizeInterval(int intervalMinutes, int fallback) =>
+        intervalMinutes is >= 1 and <= 60 ? intervalMinutes : fallback;
 
     private static TimeZoneInfo GetIndiaTimeZone()
     {

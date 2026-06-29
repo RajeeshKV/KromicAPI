@@ -71,15 +71,21 @@ public sealed class GoldRateDailyWorker(
         var indiaTimeZone = GetIndiaTimeZone();
         var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, indiaTimeZone);
 
+        if (now.DayOfWeek == DayOfWeek.Sunday)
+        {
+            var nextRun = GetNextValidRunTime(now.AddDays(1), startHour);
+            return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
+        }
+
         if (now.Hour < startHour)
         {
-            var nextRun = new DateTimeOffset(now.Year, now.Month, now.Day, startHour, 0, 0, now.Offset);
+            var nextRun = GetNextValidRunTime(now, startHour);
             return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
         }
 
         if (now.Hour > endHour)
         {
-            var nextRun = new DateTimeOffset(now.Year, now.Month, now.Day, startHour, 0, 0, now.Offset).AddDays(1);
+            var nextRun = GetNextValidRunTime(now.AddDays(1), startHour);
             return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
         }
 
@@ -95,7 +101,7 @@ public sealed class GoldRateDailyWorker(
 
         if (candidateHour > endHour)
         {
-            var nextRun = new DateTimeOffset(now.Year, now.Month, now.Day, startHour, 0, 0, now.Offset).AddDays(1);
+            var nextRun = GetNextValidRunTime(now.AddDays(1), startHour);
             return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
         }
 
@@ -107,11 +113,22 @@ public sealed class GoldRateDailyWorker(
 
         if (nextRunCandidate.Hour > endHour || (nextRunCandidate.Hour == endHour && nextRunCandidate.Minute > 0))
         {
-            var nextRun = new DateTimeOffset(now.Year, now.Month, now.Day, startHour, 0, 0, now.Offset).AddDays(1);
+            var nextRun = GetNextValidRunTime(now.AddDays(1), startHour);
             return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
         }
 
         return nextRunCandidate.ToUniversalTime() - DateTimeOffset.UtcNow;
+    }
+
+    private static DateTimeOffset GetNextValidRunTime(DateTimeOffset date, int startHour)
+    {
+        var candidate = new DateTimeOffset(date.Year, date.Month, date.Day, startHour, 0, 0, date.Offset);
+        if (candidate.DayOfWeek == DayOfWeek.Sunday)
+        {
+            candidate = candidate.AddDays(1);
+        }
+
+        return candidate;
     }
 
     private static int NormalizeHour(int hour, int fallback) =>

@@ -14,6 +14,7 @@ public sealed class KromicDbContext(DbContextOptions<KromicDbContext> options) :
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
     public DbSet<ContactSubmission> ContactSubmissions => Set<ContactSubmission>();
     public DbSet<GoldRateSnapshot> GoldRateSnapshots => Set<GoldRateSnapshot>();
+    public DbSet<GoldRateEmailSubscription> GoldRateEmailSubscriptions => Set<GoldRateEmailSubscription>();
     public DbSet<TelegramUser> TelegramUsers => Set<TelegramUser>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -77,6 +78,17 @@ public sealed class KromicDbContext(DbContextOptions<KromicDbContext> options) :
             entity.Property(x => x.LowestAlertMessageId).HasMaxLength(200);
         });
 
+        modelBuilder.Entity<GoldRateEmailSubscription>(entity =>
+        {
+            entity.HasIndex(x => x.ChatId).IsUnique();
+            entity.HasIndex(x => x.Email);
+            entity.HasIndex(x => x.UnsubscribeToken).IsUnique();
+            entity.HasIndex(x => x.IsActive);
+            entity.Property(x => x.ChatId).HasMaxLength(50);
+            entity.Property(x => x.Email).HasMaxLength(256);
+            entity.Property(x => x.UnsubscribeToken).HasMaxLength(100);
+        });
+
         modelBuilder.Entity<TelegramUser>(entity =>
         {
             entity.HasIndex(x => x.ChatId).IsUnique();
@@ -89,3 +101,6 @@ public sealed class KromicDbContext(DbContextOptions<KromicDbContext> options) :
         });
     }
 }
+
+
+

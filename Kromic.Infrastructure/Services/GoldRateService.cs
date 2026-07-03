@@ -20,6 +20,7 @@ public sealed class GoldRateService(
     ITransactionalEmailService emailService,
     ITelegramService telegramService,
     ITelegramUserService telegramUserService,
+    IGoldRateEmailSubscriptionService emailSubscriptionService,
     IOptions<GoldRateOptions> options,
     ILogger<GoldRateService> logger) : IGoldRateService
 {
@@ -249,23 +250,49 @@ public sealed class GoldRateService(
                 : "Source updated at: unavailable"
         ]);
 
+        var messageIds = new List<string>();
         var recipients = ResolveRecipients();
         if (recipients.Count == 0)
         {
-            return await emailService.SendAdminNotificationAsync(subject, heading, body, cancellationToken);
+            var messageId = await emailService.SendAdminNotificationAsync(subject, heading, body, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(messageId))
+            {
+                messageIds.Add(messageId);
+            }
+        }
+        else
+        {
+            foreach (var recipient in recipients)
+            {
+                var messageId = await emailService.SendCustomEmailAsync(
+                    recipient,
+                    string.IsNullOrWhiteSpace(_options.RecipientName) ? recipient : _options.RecipientName,
+                    subject,
+                    heading,
+                    body,
+                    null,
+                    null,
+                    cancellationToken);
+
+                if (!string.IsNullOrWhiteSpace(messageId))
+                {
+                    messageIds.Add(messageId);
+                }
+            }
         }
 
-        var messageIds = new List<string>();
-        foreach (var recipient in recipients)
+        var subscribers = await emailSubscriptionService.GetActiveSubscribersAsync(cancellationToken);
+        foreach (var subscriber in subscribers)
         {
+            var unsubscribeUrl = BuildUnsubscribeUrl(subscriber.UnsubscribeToken);
             var messageId = await emailService.SendCustomEmailAsync(
-                recipient,
-                string.IsNullOrWhiteSpace(_options.RecipientName) ? recipient : _options.RecipientName,
+                subscriber.Email,
+                subscriber.Email,
                 subject,
                 heading,
                 body,
-                null,
-                null,
+                unsubscribeUrl is null ? null : "Unsubscribe",
+                unsubscribeUrl,
                 cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(messageId))
@@ -275,6 +302,16 @@ public sealed class GoldRateService(
         }
 
         return messageIds.Count == 0 ? null : string.Join(",", messageIds);
+    }
+
+    private string? BuildUnsubscribeUrl(string token)
+    {
+        if (string.IsNullOrWhiteSpace(_options.PublicBaseUrl) || string.IsNullOrWhiteSpace(token))
+        {
+            return null;
+        }
+
+        return $"{_options.PublicBaseUrl.TrimEnd('/')}/api/gold-rate-email-alerts/unsubscribe?token={Uri.EscapeDataString(token)}";
     }
 
     private async Task SendRateTelegramAsync(
@@ -506,3 +543,4 @@ public sealed class GoldRateService(
         public string? LastUpdated { get; set; }
     }
 }
+

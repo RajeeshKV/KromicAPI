@@ -7,6 +7,7 @@ public sealed class GoldRateOptions
     public string RecipientEmailsCsv { get; set; } = string.Empty;
     public List<string> RecipientEmails { get; set; } = [];
     public string RecipientName { get; set; } = "Kromic Admin";
+    public string PublicBaseUrl { get; set; } = string.Empty;
     public bool DailyJobEnabled { get; set; } = true;
     public int ScheduleStartHour { get; set; } = 10;
     public int ScheduleEndHour { get; set; } = 20;

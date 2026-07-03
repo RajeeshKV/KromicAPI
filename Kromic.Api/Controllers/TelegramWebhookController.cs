@@ -11,6 +11,7 @@ public sealed class TelegramWebhookController(
     ITelegramUserService telegramUserService,
     ITelegramService telegramService,
     IGoldRateService goldRateService,
+    IGoldRateEmailSubscriptionService emailSubscriptionService,
     ILogger<TelegramWebhookController> logger) : ControllerBase
 {
     [HttpPost("webhook")]
@@ -53,8 +54,6 @@ public sealed class TelegramWebhookController(
                 {
                     await SendLatestRateToUserAsync(chatId, cancellationToken, isNewUser);
                 }
-
-                // Handle commands (messages starting with /)
                 if (messageText.StartsWith("/"))
                 {
                     var command = messageText.Split(' ', '@')[0].ToLowerInvariant();
@@ -67,6 +66,14 @@ public sealed class TelegramWebhookController(
                     {
                         await SendLastOneMonthRatesAsync(chatId, cancellationToken);
                     }
+                    else if (command == "/emailalerts")
+                    {
+                        await StartEmailAlertsSubscriptionAsync(chatId, cancellationToken);
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(messageText))
+                {
+                    await TryCompleteEmailAlertsSubscriptionAsync(chatId, messageText, cancellationToken);
                 }
             }
 
@@ -123,6 +130,31 @@ public sealed class TelegramWebhookController(
         return Ok(new { activeUsers = count });
     }
 
+    private async Task StartEmailAlertsSubscriptionAsync(string chatId, CancellationToken cancellationToken)
+    {
+        await emailSubscriptionService.StartEmailCaptureAsync(chatId, cancellationToken);
+
+        const string message = "Please reply with your email address within 1 minute to receive gold-rate email alerts.";
+        await telegramService.SendMessageToChatIdAsync(chatId, message, cancellationToken);
+        logger.LogInformation("Started email alert subscription capture for Telegram chat {ChatId}", chatId);
+    }
+
+    private async Task TryCompleteEmailAlertsSubscriptionAsync(string chatId, string messageText, CancellationToken cancellationToken)
+    {
+        var result = await emailSubscriptionService.TryCompleteEmailCaptureAsync(chatId, messageText, cancellationToken);
+        var response = result.Status switch
+        {
+            EmailAlertSubscriptionStatus.Subscribed => $"Email alerts enabled for {result.Email}. You can unsubscribe from any future email.",
+            EmailAlertSubscriptionStatus.InvalidEmail => "That does not look like a valid email address. Please send a valid email within 1 minute.",
+            EmailAlertSubscriptionStatus.Expired => "The email alert request expired. Send /emailalerts again to subscribe.",
+            _ => null
+        };
+
+        if (!string.IsNullOrWhiteSpace(response))
+        {
+            await telegramService.SendMessageToChatIdAsync(chatId, response, cancellationToken);
+        }
+    }
     private async Task SendLatestRateToUserAsync(string chatId, CancellationToken cancellationToken, bool isNewUser = false)
     {
         try
@@ -270,3 +302,5 @@ public sealed class TelegramWebhookController(
         }
     }
 }
+
+

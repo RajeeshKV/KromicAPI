@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<ICustomEmailService, CustomEmailService>();
         services.AddScoped<ICloudinaryImageService, CloudinaryImageService>();
         services.AddScoped<ITelegramUserService, TelegramUserService>();
+        services.AddScoped<IGoldRateEmailSubscriptionService, GoldRateEmailSubscriptionService>();
         services.AddSingleton<IPortfolioCache, MemoryPortfolioCache>();
         services.AddHostedService<GoldRateDailyWorker>();
         services.AddHttpClient<IGoldRateService, GoldRateService>();
@@ -65,3 +66,4 @@ public static class DependencyInjection
         return services;
     }
 }
+

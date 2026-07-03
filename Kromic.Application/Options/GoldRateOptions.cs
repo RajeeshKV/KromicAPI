@@ -2,7 +2,7 @@ namespace Kromic.Application.Options;
 
 public sealed class GoldRateOptions
 {
-    public string Endpoint { get; set; } = "https://backend.josalukkasonline.com/api/Master/GetLatestGoldRate";
+    public string Endpoint { get; set; } = "https://akgsma.com/";
     public string RecipientEmail { get; set; } = string.Empty;
     public string RecipientEmailsCsv { get; set; } = string.Empty;
     public List<string> RecipientEmails { get; set; } = [];

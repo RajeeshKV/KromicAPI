@@ -1,6 +1,8 @@
 using System.Globalization;
-using System.Net.Http.Json;
+using System.Net;
 using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using Kromic.Application.DTOs;
 using Kromic.Application.Interfaces;
 using Kromic.Application.Options;
@@ -8,6 +10,7 @@ using Kromic.Domain.Entities;
 using Kromic.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 
 namespace Kromic.Infrastructure.Services;
 
@@ -17,9 +20,14 @@ public sealed class GoldRateService(
     ITransactionalEmailService emailService,
     ITelegramService telegramService,
     ITelegramUserService telegramUserService,
-    IOptions<GoldRateOptions> options) : IGoldRateService
+    IOptions<GoldRateOptions> options,
+    ILogger<GoldRateService> logger) : IGoldRateService
 {
     private static readonly TimeSpan IndiaOffset = TimeSpan.FromHours(5.5);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
     private readonly GoldRateOptions _options = options.Value;
 
     public async Task<GoldRateFetchResponse> FetchAndStoreAsync(
@@ -28,9 +36,10 @@ public sealed class GoldRateService(
         CancellationToken cancellationToken)
     {
         var source = await FetchLatestGoldRateAsync(cancellationToken);
-        if (source?.Success != true || source.Data is null)
+        var data = source?.ReadData();
+        if (source?.Success != true || data is null)
         {
-            throw new InvalidOperationException(source?.Message ?? "Gold rate endpoint did not return a successful response.");
+            throw new InvalidOperationException(source?.Message ?? "Gold rate endpoint did not return a successful response with usable Data.");
         }
 
         var fetchedAt = DateTimeOffset.UtcNow;
@@ -40,8 +49,12 @@ public sealed class GoldRateService(
             .OrderByDescending(x => x.FetchedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (latestToday is not null && latestToday.R22KT == source.Data.R22KT)
+        if (latestToday is not null && latestToday.R22KT == data.R22KT)
         {
+            logger.LogInformation(
+                "Gold rate unchanged for {Date}. Latest stored 22K rate: {Rate}. Skipping save and notifications.",
+                TimeZoneInfo.ConvertTime(fetchedAt, GetIndiaTimeZone()).Date,
+                data.R22KT);
             return new GoldRateFetchResponse(ToResponse(latestToday), RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
         }
 
@@ -49,15 +62,15 @@ public sealed class GoldRateService(
             .AsNoTracking()
             .MinAsync(x => (decimal?)x.R22KT, cancellationToken);
 
-        var isLowest = previousLowest.HasValue && source.Data.R22KT < previousLowest.Value;
+        var isLowest = previousLowest.HasValue && data.R22KT < previousLowest.Value;
         var snapshot = new GoldRateSnapshot
         {
-            SourceId = source.Data.Id,
-            R22KT = source.Data.R22KT,
-            R22KTShow = source.Data.R22KTShow,
-            R18KT = source.Data.R18KT,
-            R24KT = source.Data.R24KT,
-            SourceLastUpdatedAt = ParseIndiaDateTime(source.Data.LastUpdated),
+            SourceId = data.Id,
+            R22KT = data.R22KT,
+            R22KTShow = data.R22KTShow,
+            R18KT = data.R18KT,
+            R24KT = data.R24KT,
+            SourceLastUpdatedAt = ParseIndiaDateTime(data.LastUpdated),
             FetchedAt = fetchedAt,
             IsLowestAtFetch = isLowest
         };
@@ -84,7 +97,32 @@ public sealed class GoldRateService(
 
         return new GoldRateFetchResponse(ToResponse(snapshot), sendRegularEmail, sendLowestAlert && isLowest, RateChanged: true);
     }
+
     private async Task<GoldRateApiResponse?> FetchLatestGoldRateAsync(CancellationToken cancellationToken)
+    {
+        if (IsAkgsmaEndpoint(_options.Endpoint))
+        {
+            return await FetchAkgsmaGoldRateAsync(cancellationToken);
+        }
+
+        return await FetchJsonGoldRateAsync(cancellationToken);
+    }
+
+    private async Task<GoldRateApiResponse?> FetchAkgsmaGoldRateAsync(CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, _options.Endpoint);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var html = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"AKGSMA gold rate page failed with {(int)response.StatusCode} {response.ReasonPhrase}. Response: {html}");
+        }
+
+        return ParseAkgsmaHtml(html);
+    }
+
+    private async Task<GoldRateApiResponse?> FetchJsonGoldRateAsync(CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, _options.Endpoint)
         {
@@ -92,16 +130,59 @@ public sealed class GoldRateService(
         };
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
                 $"Gold rate endpoint failed with {(int)response.StatusCode} {response.ReasonPhrase}. Response: {responseBody}");
         }
 
-        return await response.Content.ReadFromJsonAsync<GoldRateApiResponse>(cancellationToken);
+        try
+        {
+            return JsonSerializer.Deserialize<GoldRateApiResponse>(responseBody, JsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException($"Gold rate endpoint returned unexpected JSON. Response: {responseBody}", ex);
+        }
     }
 
+    private static GoldRateApiResponse ParseAkgsmaHtml(string html)
+    {
+        var decodedHtml = WebUtility.HtmlDecode(html);
+        var dateMatch = Regex.Match(
+            decodedHtml,
+            @"Today['’]s\s+Rate\s*\((?<date>\d{2}/\d{2}/\d{4})\)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        var rateMatch = Regex.Match(
+            decodedHtml,
+            @"22K916\s*\(\s*1\s*gm\s*\)\s*-\s*[^\d]*(?<rate>[\d,]+(?:\.\d+)?)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        if (!rateMatch.Success)
+        {
+            throw new InvalidOperationException("AKGSMA gold rate page did not contain a 22K916 (1gm) rate.");
+        }
+
+        var rateText = rateMatch.Groups["rate"].Value.Replace(",", string.Empty);
+        if (!decimal.TryParse(rateText, NumberStyles.Number, CultureInfo.InvariantCulture, out var r22Kt))
+        {
+            throw new InvalidOperationException($"AKGSMA 22K916 rate could not be parsed: {rateText}");
+        }
+
+        var data = new GoldRateApiData
+        {
+            Id = 0,
+            R22KT = r22Kt,
+            R22KTShow = true,
+            LastUpdated = dateMatch.Success ? dateMatch.Groups["date"].Value : null
+        };
+
+        return GoldRateApiResponse.FromData("AKGSMA rate parsed successfully.", data);
+    }
+    private static bool IsAkgsmaEndpoint(string endpoint) =>
+        Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) &&
+        uri.Host.Contains("akgsma.com", StringComparison.OrdinalIgnoreCase);
     public async Task<GoldRateSnapshotResponse?> GetCurrentAsync(CancellationToken cancellationToken)
     {
         var snapshot = await dbContext.GoldRateSnapshots
@@ -290,6 +371,11 @@ public sealed class GoldRateService(
             return offsetValue.ToUniversalTime();
         }
 
+        if (DateTime.TryParseExact(value, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dayFirstDate))
+        {
+            return new DateTimeOffset(DateTime.SpecifyKind(dayFirstDate, DateTimeKind.Unspecified), IndiaOffset).ToUniversalTime();
+        }
+
         if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateTime))
         {
             return new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Unspecified), IndiaOffset).ToUniversalTime();
@@ -349,7 +435,65 @@ public sealed class GoldRateService(
     {
         public string? Message { get; set; }
         public bool Success { get; set; }
-        public GoldRateApiData? Data { get; set; }
+        public JsonElement Data { get; set; }
+        private GoldRateApiData? ParsedData { get; set; }
+
+        public static GoldRateApiResponse FromData(string message, GoldRateApiData data) =>
+            new()
+            {
+                Message = message,
+                Success = true,
+                ParsedData = data
+            };
+
+        public GoldRateApiData? ReadData()
+        {
+            if (ParsedData is not null)
+            {
+                return ParsedData;
+            }
+
+            return Data.ValueKind switch
+            {
+                JsonValueKind.Object => DeserializeDataElement(Data),
+                JsonValueKind.Array => ReadFirstArrayItem(Data),
+                JsonValueKind.String => ReadStringData(Data.GetString()),
+                _ => null
+            };
+        }
+
+        private static GoldRateApiData? ReadFirstArrayItem(JsonElement array)
+        {
+            foreach (var item in array.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.Object)
+                {
+                    return DeserializeDataElement(item);
+                }
+            }
+
+            return null;
+        }
+
+        private static GoldRateApiData? ReadStringData(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            using var document = JsonDocument.Parse(value);
+            var root = document.RootElement;
+            return root.ValueKind switch
+            {
+                JsonValueKind.Object => DeserializeDataElement(root),
+                JsonValueKind.Array => ReadFirstArrayItem(root),
+                _ => null
+            };
+        }
+
+        private static GoldRateApiData? DeserializeDataElement(JsonElement element) =>
+            JsonSerializer.Deserialize<GoldRateApiData>(element.GetRawText(), JsonOptions);
     }
 
     private sealed class GoldRateApiData

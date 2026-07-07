@@ -37,23 +37,47 @@ public sealed class GoldRateDailyWorker(
                 endHour = 20;
             }
 
-            var delay = GetDelayUntilNextRun(startHour, endHour, intervalMinutes);
-            logger.LogInformation(
-                "Next gold rate fetch scheduled in {Delay}. Active window: {StartHour}:00-{EndHour}:00 IST, interval: {IntervalMinutes} minutes.",
-                delay,
-                startHour,
-                endHour,
-                intervalMinutes);
-            await Task.Delay(delay, stoppingToken);
+            var akgsmaPreMarketStartHour = ResolveAkgsmaPreMarketStartHour(startHour);
+            var nextRun = GetNextRun(startHour, endHour, intervalMinutes, akgsmaPreMarketStartHour);
+            if (nextRun.IsAkgsmaPreMarket)
+            {
+                logger.LogInformation(
+                    "Next AKGSMA pre-market gold rate fetch scheduled in {Delay}. Pre-market window: {PreMarketStartHour}:00-{StartHour}:00 IST, interval: {IntervalMinutes} minutes.",
+                    nextRun.Delay,
+                    akgsmaPreMarketStartHour,
+                    startHour,
+                    intervalMinutes);
+            }
+            else
+            {
+                logger.LogInformation(
+                    "Next gold rate fetch scheduled in {Delay}. Active window: {StartHour}:00-{EndHour}:00 IST, interval: {IntervalMinutes} minutes.",
+                    nextRun.Delay,
+                    startHour,
+                    endHour,
+                    intervalMinutes);
+            }
+
+            await Task.Delay(nextRun.Delay, stoppingToken);
 
             try
             {
                 using var scope = scopeFactory.CreateScope();
                 var goldRateService = scope.ServiceProvider.GetRequiredService<IGoldRateService>();
-                await goldRateService.FetchAndStoreAsync(
-                    sendRegularEmail: true,
-                    sendLowestAlert: true,
-                    stoppingToken);
+                if (nextRun.IsAkgsmaPreMarket)
+                {
+                    await goldRateService.FetchAkgsmaTodayAndStoreAsync(
+                        sendRegularEmail: true,
+                        sendLowestAlert: true,
+                        stoppingToken);
+                }
+                else
+                {
+                    await goldRateService.FetchAndStoreAsync(
+                        sendRegularEmail: true,
+                        sendLowestAlert: true,
+                        stoppingToken);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -61,32 +85,96 @@ public sealed class GoldRateDailyWorker(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Scheduled gold rate fetch failed.");
+                logger.LogError(ex, nextRun.IsAkgsmaPreMarket
+                    ? "Scheduled AKGSMA pre-market gold rate fetch failed."
+                    : "Scheduled gold rate fetch failed.");
             }
         }
     }
 
-    private static TimeSpan GetDelayUntilNextRun(int startHour, int endHour, int intervalMinutes)
+    private int? ResolveAkgsmaPreMarketStartHour(int scheduleStartHour)
+    {
+        if (!_options.AkgsmaPreMarketFetchEnabled || !IsAkgsmaEndpoint(_options.Endpoint))
+        {
+            return null;
+        }
+
+        var preMarketStartHour = NormalizeHour(_options.AkgsmaPreMarketStartHour, fallback: 6);
+        return preMarketStartHour < scheduleStartHour ? preMarketStartHour : null;
+    }
+
+    private static ScheduledRun GetNextRun(
+        int startHour,
+        int endHour,
+        int intervalMinutes,
+        int? akgsmaPreMarketStartHour)
     {
         var indiaTimeZone = GetIndiaTimeZone();
         var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, indiaTimeZone);
 
-        if (now.DayOfWeek == DayOfWeek.Sunday)
+        for (var dayOffset = 0; dayOffset <= 7; dayOffset++)
         {
-            var nextRun = GetNextValidRunTime(now.AddDays(1), startHour);
-            return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
+            var date = now.Date.AddDays(dayOffset);
+            if (date.DayOfWeek == DayOfWeek.Sunday)
+            {
+                continue;
+            }
+
+            if (akgsmaPreMarketStartHour.HasValue)
+            {
+                var preMarketRun = GetNextRunInWindow(
+                    now,
+                    date,
+                    akgsmaPreMarketStartHour.Value,
+                    startHour,
+                    intervalMinutes,
+                    includeEndHour: false);
+                if (preMarketRun.HasValue)
+                {
+                    return new ScheduledRun(ToDelay(preMarketRun.Value), IsAkgsmaPreMarket: true);
+                }
+            }
+
+            var regularRun = GetNextRunInWindow(
+                now,
+                date,
+                startHour,
+                endHour,
+                intervalMinutes,
+                includeEndHour: true);
+            if (regularRun.HasValue)
+            {
+                return new ScheduledRun(ToDelay(regularRun.Value), IsAkgsmaPreMarket: false);
+            }
         }
 
-        if (now.Hour < startHour)
+        var fallback = GetNextValidRunTime(now.AddDays(1), startHour);
+        return new ScheduledRun(ToDelay(fallback), IsAkgsmaPreMarket: false);
+    }
+
+    private static DateTimeOffset? GetNextRunInWindow(
+        DateTimeOffset now,
+        DateTime date,
+        int startHour,
+        int endHour,
+        int intervalMinutes,
+        bool includeEndHour)
+    {
+        var windowStart = new DateTimeOffset(date.Year, date.Month, date.Day, startHour, 0, 0, now.Offset);
+        var windowEnd = new DateTimeOffset(date.Year, date.Month, date.Day, endHour, 0, 0, now.Offset);
+        if (!includeEndHour)
         {
-            var nextRun = GetNextValidRunTime(now, startHour);
-            return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
+            windowEnd = windowEnd.AddTicks(-1);
         }
 
-        if (now.Hour > endHour)
+        if (now > windowEnd)
         {
-            var nextRun = GetNextValidRunTime(now.AddDays(1), startHour);
-            return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
+            return null;
+        }
+
+        if (now < windowStart)
+        {
+            return windowStart;
         }
 
         var minuteBlock = now.Minute / intervalMinutes;
@@ -99,25 +187,19 @@ public sealed class GoldRateDailyWorker(
             nextMinute = 0;
         }
 
-        if (candidateHour > endHour)
+        var candidate = new DateTimeOffset(now.Year, now.Month, now.Day, candidateHour, nextMinute, 0, now.Offset);
+        if (candidate <= now)
         {
-            var nextRun = GetNextValidRunTime(now.AddDays(1), startHour);
-            return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
+            candidate = candidate.AddMinutes(intervalMinutes);
         }
 
-        var nextRunCandidate = new DateTimeOffset(now.Year, now.Month, now.Day, candidateHour, nextMinute, 0, now.Offset);
-        if (nextRunCandidate <= now)
-        {
-            nextRunCandidate = nextRunCandidate.AddMinutes(intervalMinutes);
-        }
+        return candidate <= windowEnd ? candidate : null;
+    }
 
-        if (nextRunCandidate.Hour > endHour || (nextRunCandidate.Hour == endHour && nextRunCandidate.Minute > 0))
-        {
-            var nextRun = GetNextValidRunTime(now.AddDays(1), startHour);
-            return nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
-        }
-
-        return nextRunCandidate.ToUniversalTime() - DateTimeOffset.UtcNow;
+    private static TimeSpan ToDelay(DateTimeOffset nextRun)
+    {
+        var delay = nextRun.ToUniversalTime() - DateTimeOffset.UtcNow;
+        return delay < TimeSpan.Zero ? TimeSpan.Zero : delay;
     }
 
     private static DateTimeOffset GetNextValidRunTime(DateTimeOffset date, int startHour)
@@ -137,6 +219,10 @@ public sealed class GoldRateDailyWorker(
     private static int NormalizeInterval(int intervalMinutes, int fallback) =>
         intervalMinutes is >= 1 and <= 60 ? intervalMinutes : fallback;
 
+    private static bool IsAkgsmaEndpoint(string endpoint) =>
+        Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) &&
+        uri.Host.Contains("akgsma.com", StringComparison.OrdinalIgnoreCase);
+
     private static TimeZoneInfo GetIndiaTimeZone()
     {
         try
@@ -148,4 +234,6 @@ public sealed class GoldRateDailyWorker(
             return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
         }
     }
+
+    private sealed record ScheduledRun(TimeSpan Delay, bool IsAkgsmaPreMarket);
 }

@@ -43,6 +43,44 @@ public sealed class GoldRateService(
             throw new InvalidOperationException(source?.Message ?? "Gold rate endpoint did not return a successful response with usable Data.");
         }
 
+        return await StoreFetchedGoldRateAsync(data, sendRegularEmail, sendLowestAlert, cancellationToken);
+    }
+
+    public async Task<GoldRateFetchResponse?> FetchAkgsmaTodayAndStoreAsync(
+        bool sendRegularEmail,
+        bool sendLowestAlert,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAkgsmaEndpoint(_options.Endpoint))
+        {
+            logger.LogDebug("Skipping AKGSMA pre-market fetch because the configured gold rate endpoint is {Endpoint}.", _options.Endpoint);
+            return null;
+        }
+
+        var source = await FetchAkgsmaGoldRateAsync(cancellationToken);
+        var data = source?.ReadData();
+        if (source?.Success != true || data is null)
+        {
+            throw new InvalidOperationException(source?.Message ?? "AKGSMA gold rate page did not return usable data.");
+        }
+
+        if (!IsSourceDateTodayInIndia(data.LastUpdated))
+        {
+            logger.LogInformation(
+                "AKGSMA pre-market page is not dated today yet. Source date: {SourceDate}.",
+                string.IsNullOrWhiteSpace(data.LastUpdated) ? "unavailable" : data.LastUpdated);
+            return null;
+        }
+
+        return await StoreFetchedGoldRateAsync(data, sendRegularEmail, sendLowestAlert, cancellationToken);
+    }
+
+    private async Task<GoldRateFetchResponse> StoreFetchedGoldRateAsync(
+        GoldRateApiData data,
+        bool sendRegularEmail,
+        bool sendLowestAlert,
+        CancellationToken cancellationToken)
+    {
         var fetchedAt = DateTimeOffset.UtcNow;
         var todayRange = GetIndiaDayRange(fetchedAt);
         var latestToday = await dbContext.GoldRateSnapshots
@@ -98,7 +136,6 @@ public sealed class GoldRateService(
 
         return new GoldRateFetchResponse(ToResponse(snapshot), sendRegularEmail, sendLowestAlert && isLowest, RateChanged: true);
     }
-
     private async Task<GoldRateApiResponse?> FetchLatestGoldRateAsync(CancellationToken cancellationToken)
     {
         if (IsAkgsmaEndpoint(_options.Endpoint))
@@ -184,6 +221,20 @@ public sealed class GoldRateService(
     private static bool IsAkgsmaEndpoint(string endpoint) =>
         Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) &&
         uri.Host.Contains("akgsma.com", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsSourceDateTodayInIndia(string? sourceDate)
+    {
+        var sourceUpdatedAt = ParseIndiaDateTime(sourceDate);
+        if (!sourceUpdatedAt.HasValue)
+        {
+            return false;
+        }
+
+        var indiaTimeZone = GetIndiaTimeZone();
+        var sourceIndiaDate = TimeZoneInfo.ConvertTime(sourceUpdatedAt.Value, indiaTimeZone).Date;
+        var todayIndiaDate = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, indiaTimeZone).Date;
+        return sourceIndiaDate == todayIndiaDate;
+    }
     public async Task<GoldRateSnapshotResponse?> GetCurrentAsync(CancellationToken cancellationToken)
     {
         var snapshot = await dbContext.GoldRateSnapshots

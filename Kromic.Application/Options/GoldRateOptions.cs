@@ -12,6 +12,8 @@ public sealed class GoldRateOptions
     public int ScheduleStartHour { get; set; } = 10;
     public int ScheduleEndHour { get; set; } = 20;
     public int ScheduleIntervalMinutes { get; set; } = 5;
+    public bool AkgsmaPreMarketFetchEnabled { get; set; } = true;
+    public int AkgsmaPreMarketStartHour { get; set; } = 6;
     public string TelegramBotToken { get; set; } = string.Empty;
     public string TelegramChatIdsCsv { get; set; } = string.Empty;
     public List<string> TelegramChatIds { get; set; } = [];

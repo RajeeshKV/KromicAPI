@@ -9,6 +9,11 @@ public interface IGoldRateService
         bool sendLowestAlert,
         CancellationToken cancellationToken);
 
+    Task<GoldRateFetchResponse?> FetchAkgsmaTodayAndStoreAsync(
+        bool sendRegularEmail,
+        bool sendLowestAlert,
+        CancellationToken cancellationToken);
+
     Task<GoldRateSnapshotResponse?> GetCurrentAsync(CancellationToken cancellationToken);
 
     Task<GoldRateHistoryResponse> GetHistoryAsync(

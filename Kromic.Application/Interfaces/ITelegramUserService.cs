@@ -1,11 +1,12 @@
+using Kromic.Application.DTOs;
 using Kromic.Domain.Entities;
 
 namespace Kromic.Application.Interfaces;
 
 public interface ITelegramUserService
 {
-    Task<TelegramUser?> GetUserByChatIdAsync(string chatId, CancellationToken cancellationToken);
-    Task<TelegramUser> AddOrUpdateUserAsync(
+    Task<Kromic.Domain.Entities.TelegramUser?> GetUserByChatIdAsync(string chatId, CancellationToken cancellationToken);
+    Task<Kromic.Domain.Entities.TelegramUser> AddOrUpdateUserAsync(
         string chatId,
         string? firstName,
         string? lastName,
@@ -13,4 +14,5 @@ public interface ITelegramUserService
         CancellationToken cancellationToken);
     Task<List<string>> GetActiveChatIdsAsync(CancellationToken cancellationToken);
     Task<int> GetActiveChatCountAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<TelegramBotUserResponse>> GetUsersWithEmailSubscriptionsAsync(CancellationToken cancellationToken);
 }

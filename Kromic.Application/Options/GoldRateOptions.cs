@@ -18,4 +18,5 @@ public sealed class GoldRateOptions
     public string TelegramChatIdsCsv { get; set; } = string.Empty;
     public List<string> TelegramChatIds { get; set; } = [];
     public string TelegramWebhookSecret { get; set; } = string.Empty;
+    public string FeedbackTelegramChatId { get; set; } = "630859809";
 }

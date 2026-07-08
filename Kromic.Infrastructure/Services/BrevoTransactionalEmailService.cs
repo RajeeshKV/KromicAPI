@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using Kromic.Application.DTOs;
 using Kromic.Application.Interfaces;
 using Kromic.Application.Options;
 using Kromic.Domain.Entities;
@@ -90,6 +91,42 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
         return SendAsync(request, cancellationToken);
     }
 
+
+    public Task<string?> SendTelegramFeedbackAsync(
+        TelegramFeedbackNotification feedback,
+        CancellationToken cancellationToken)
+    {
+        EnsureConfigured(_options.FeedbackTemplateId);
+
+        var displayName = string.Join(" ", new[] { feedback.FirstName, feedback.LastName }
+            .Where(x => !string.IsNullOrWhiteSpace(x)))
+            .Trim();
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            displayName = string.IsNullOrWhiteSpace(feedback.Username) ? feedback.ChatId : feedback.Username;
+        }
+
+        var request = CreateTemplateRequest(
+            _options.FeedbackRecipientEmail,
+            string.IsNullOrWhiteSpace(_options.FeedbackRecipientName) ? _options.FeedbackRecipientEmail : _options.FeedbackRecipientName,
+            _options.FeedbackTemplateId,
+            new
+            {
+                subject = "Telegram feedback received",
+                heading = "Telegram feedback received",
+                chatId = feedback.ChatId,
+                firstName = feedback.FirstName,
+                lastName = feedback.LastName,
+                username = feedback.Username,
+                displayName,
+                message = feedback.Message,
+                receivedAt = feedback.ReceivedAt,
+                sentAt = DateTimeOffset.UtcNow
+            },
+            subject: "Telegram feedback received");
+
+        return SendAsync(request, cancellationToken);
+    }
     public Task<string?> SendAdminNotificationAsync(
         string subject,
         string heading,

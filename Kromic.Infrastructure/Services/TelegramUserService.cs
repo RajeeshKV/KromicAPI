@@ -1,3 +1,4 @@
+using Kromic.Application.DTOs;
 using Kromic.Application.Interfaces;
 using Kromic.Domain.Entities;
 using Kromic.Infrastructure.Persistence;
@@ -74,5 +75,30 @@ public sealed class TelegramUserService(
         return await dbContext.TelegramUsers
             .AsNoTracking()
             .CountAsync(x => x.IsActive, cancellationToken);
+    }
+    public async Task<IReadOnlyList<TelegramBotUserResponse>> GetUsersWithEmailSubscriptionsAsync(CancellationToken cancellationToken)
+    {
+        return await dbContext.TelegramUsers
+            .AsNoTracking()
+            .GroupJoin(
+                dbContext.GoldRateEmailSubscriptions.AsNoTracking(),
+                user => user.ChatId,
+                subscription => subscription.ChatId,
+                (user, subscriptions) => new { user, subscription = subscriptions.OrderByDescending(x => x.UpdatedAt).FirstOrDefault() })
+            .OrderByDescending(x => x.user.LastInteractedAt ?? x.user.CreatedAt)
+            .Select(x => new TelegramBotUserResponse(
+                x.user.Id,
+                x.user.ChatId,
+                x.user.FirstName,
+                x.user.LastName,
+                x.user.Username,
+                x.user.IsActive,
+                x.user.CreatedAt,
+                x.user.LastInteractedAt,
+                x.subscription == null ? null : x.subscription.Email,
+                x.subscription != null && x.subscription.IsActive && x.subscription.Email != null,
+                x.subscription == null ? null : x.subscription.SubscribedAt,
+                x.subscription == null ? null : x.subscription.UnsubscribedAt))
+            .ToListAsync(cancellationToken);
     }
 }

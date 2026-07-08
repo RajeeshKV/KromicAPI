@@ -293,8 +293,11 @@ public sealed class GoldRateService(
         var heading = isLowestAlert
             ? "This is the lowest saved 22K rate. Buy gold now."
             : "Today's 22K gold rate";
+        var eightGramRate = snapshot.R22KT * 8;
         var body = string.Join(Environment.NewLine, [
-            $"22K Gold Rate: {snapshot.R22KT:N2}",
+            $"22K Gold Rate (1g): Rs. {snapshot.R22KT:N2}",
+            $"22K Gold Rate (8g): Rs. {eightGramRate:N2}",
+            "1g is the primary rate. 8g is shown for quick reference.",
             $"Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST",
             snapshot.SourceLastUpdatedAt.HasValue
                 ? $"Source updated at: {TimeZoneInfo.ConvertTime(snapshot.SourceLastUpdatedAt.Value, GetIndiaTimeZone()):dd MMM yyyy, hh:mm tt} IST"
@@ -371,17 +374,17 @@ public sealed class GoldRateService(
         CancellationToken cancellationToken)
     {
         var istFetchedAt = TimeZoneInfo.ConvertTime(snapshot.FetchedAt, GetIndiaTimeZone());
-        var message = isLowestAlert
-            ? $"<b>🚨 Lowest Gold Rate Found!</b>\n\n" +
-              $"<b>22K Gold Rate:</b> ₹{snapshot.R22KT:N2}\n" +
-              $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>"
-            : $"<b>📈 Today's Gold Rate</b>\n\n" +
-              $"<b>22K Gold Rate:</b> ₹{snapshot.R22KT:N2}\n" +
-              $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
+        var eightGramRate = snapshot.R22KT * 8;
+        var title = isLowestAlert ? "Lowest Gold Rate Found" : "Today's Gold Rate";
+        var message = $"<b>{title}</b>\n\n" +
+            "<b>22K Gold Rate</b>\n" +
+            $"1g: Rs. {snapshot.R22KT:N2}\n" +
+            $"8g: Rs. {eightGramRate:N2}\n" +
+            "<i>1g is the primary rate. 8g is shown for quick reference.</i>\n" +
+            $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
 
         await telegramService.SendMessageAsync(message, cancellationToken);
     }
-
     private async Task SyncConfiguredTelegramUsersAsync(CancellationToken cancellationToken)
     {
         // Add configured chat IDs to database if they're not already there

@@ -1,3 +1,4 @@
+using Kromic.Application.DTOs;
 using Kromic.Domain.Entities;
 
 namespace Kromic.Application.Interfaces;
@@ -15,7 +16,9 @@ public interface ITransactionalEmailService
         string? callToActionText,
         string? callToActionUrl,
         CancellationToken cancellationToken);
-    Task<string?> SendAdminNotificationAsync(
+    Task<string?> SendTelegramFeedbackAsync(
+        TelegramFeedbackNotification feedback,
+        CancellationToken cancellationToken);    Task<string?> SendAdminNotificationAsync(
         string subject,
         string heading,
         string body,

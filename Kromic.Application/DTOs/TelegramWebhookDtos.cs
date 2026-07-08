@@ -20,7 +20,7 @@ public class TelegramMessage
     public int MessageId { get; set; }
 
     [JsonPropertyName("from")]
-    public TelegramUser? From { get; set; }
+    public TelegramUserDTO? From { get; set; }
 
     [JsonPropertyName("chat")]
     public TelegramChat? Chat { get; set; }
@@ -38,7 +38,7 @@ public class TelegramMyChatMember
     public TelegramChat? Chat { get; set; }
 
     [JsonPropertyName("from")]
-    public TelegramUser? From { get; set; }
+    public TelegramUserDTO? From { get; set; }
 
     [JsonPropertyName("date")]
     public int Date { get; set; }
@@ -47,7 +47,7 @@ public class TelegramMyChatMember
     public TelegramChatMember? NewChatMember { get; set; }
 }
 
-public class TelegramUser
+public class TelegramUserDTO
 {
     [JsonPropertyName("id")]
     public long Id { get; set; }
@@ -92,8 +92,29 @@ public class TelegramChat
 public class TelegramChatMember
 {
     [JsonPropertyName("user")]
-    public TelegramUser? User { get; set; }
+    public TelegramUserDTO? User { get; set; }
 
     [JsonPropertyName("status")]
     public string? Status { get; set; }
 }
+public sealed record TelegramFeedbackNotification(
+    string ChatId,
+    string? FirstName,
+    string? LastName,
+    string? Username,
+    string Message,
+    DateTimeOffset ReceivedAt);
+
+public sealed record TelegramBotUserResponse(
+    Guid Id,
+    string ChatId,
+    string? FirstName,
+    string? LastName,
+    string? Username,
+    bool IsActive,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? LastInteractedAt,
+    string? Email,
+    bool EmailAlertsEnabled,
+    DateTimeOffset? EmailSubscribedAt,
+    DateTimeOffset? EmailUnsubscribedAt);

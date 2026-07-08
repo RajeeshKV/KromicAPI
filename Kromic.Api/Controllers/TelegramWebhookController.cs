@@ -291,7 +291,6 @@ public sealed class TelegramWebhookController(
                           "<b>22K Gold Rate</b>\n" +
                           $"1g: Rs. {currentRate.R22KT:N2}\n" +
                           $"8g: Rs. {eightGramRate:N2}\n" +
-                          "<i>1g is the primary rate. 8g is shown for quick reference.</i>\n" +
                           $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
 
             if (isNewUser)

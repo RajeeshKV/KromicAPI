@@ -190,7 +190,7 @@ public sealed class GoldRateService(
         var decodedHtml = WebUtility.HtmlDecode(html);
         var dateMatch = Regex.Match(
             decodedHtml,
-            @"Today['’]s\s+Rate\s*\((?<date>\d{2}/\d{2}/\d{4})\)",
+            @"Today['ï¿½]s\s+Rate\s*\((?<date>\d{2}/\d{2}/\d{4})\)",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         var rateMatch = Regex.Match(
             decodedHtml,
@@ -297,7 +297,6 @@ public sealed class GoldRateService(
         var body = string.Join(Environment.NewLine, [
             $"22K Gold Rate (1g): Rs. {snapshot.R22KT:N2}",
             $"22K Gold Rate (8g): Rs. {eightGramRate:N2}",
-            "1g is the primary rate. 8g is shown for quick reference.",
             $"Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST",
             snapshot.SourceLastUpdatedAt.HasValue
                 ? $"Source updated at: {TimeZoneInfo.ConvertTime(snapshot.SourceLastUpdatedAt.Value, GetIndiaTimeZone()):dd MMM yyyy, hh:mm tt} IST"
@@ -380,7 +379,6 @@ public sealed class GoldRateService(
             "<b>22K Gold Rate</b>\n" +
             $"1g: Rs. {snapshot.R22KT:N2}\n" +
             $"8g: Rs. {eightGramRate:N2}\n" +
-            "<i>1g is the primary rate. 8g is shown for quick reference.</i>\n" +
             $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
 
         await telegramService.SendMessageAsync(message, cancellationToken);

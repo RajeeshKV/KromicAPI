@@ -177,7 +177,7 @@ public sealed class TelegramWebhookController(
         memoryCache.Set(GetFeedbackCacheKey(chatId), true, FeedbackCaptureWindow);
         await telegramService.SendMessageToChatIdAsync(
             chatId,
-            "Please send your feedback in the next message. I will forward it to Rajeesh.",
+            "Please send your feedback in the next message. I will forward it to Admin.",
             cancellationToken);
         logger.LogInformation("Started feedback capture for Telegram chat {ChatId}", chatId);
     }

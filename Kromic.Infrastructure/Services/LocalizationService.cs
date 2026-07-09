@@ -51,7 +51,7 @@ public sealed class LocalizationService : ILocalizationService
             }
         }
 
-        _logger.LogWarning("Localization key not found: {Key} for language: {Language}", key, language);
+        _logger.LogWarning("Localization key not found: {Key} for language: {Language}. Available keys: {AvailableKeys}", key, language, string.Join(", ", _resources.Keys));
         return key; // Return key as fallback
     }
 

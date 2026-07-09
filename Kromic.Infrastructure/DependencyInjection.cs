@@ -36,7 +36,7 @@ public static class DependencyInjection
         services.AddScoped<ITelegramUserService, TelegramUserService>();
         services.AddScoped<IGoldRateEmailSubscriptionService, GoldRateEmailSubscriptionService>();
         services.AddScoped<IUserSettingsService, UserSettingsService>();
-        services.AddSingleton<ILocalizationService, LocalizationService>();
+        services.AddScoped<ILocalizationService, LocalizationService>();
         services.AddSingleton<ITelegramConfigurationService, TelegramConfigurationService>();
         services.AddSingleton<IPortfolioCache, MemoryPortfolioCache>();
         services.AddHostedService<GoldRateDailyWorker>();

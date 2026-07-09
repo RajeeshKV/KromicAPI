@@ -344,7 +344,7 @@ public sealed class TelegramWebhookController(
 
             case "settings":
                 message = localizationService.GetString("commands.menu_settings", language);
-                menu = GetSettingsMenu(language);
+                menu = await GetSettingsMenuAsync(chatId, language, cancellationToken);
                 break;
 
             case "email":
@@ -394,12 +394,18 @@ public sealed class TelegramWebhookController(
                     var langName = param == "en" ? (englishText ?? "English") : (malayalamText ?? "Malayalam");
                     
                     var langChangedMsg = localizationService.GetString("commands.language_changed", language, langName);
-                    if (string.IsNullOrWhiteSpace(langChangedMsg))
+                    
+                    // Fallback if localization returns the key itself
+                    if (langChangedMsg.StartsWith("commands."))
+                    {
+                        langChangedMsg = $"Language changed to {langName}.";
+                    }
+                    else if (string.IsNullOrWhiteSpace(langChangedMsg))
                     {
                         langChangedMsg = $"Language changed to {langName}.";
                     }
                     
-                    logger.LogInformation("Language changed to {Lang} for chat ID: {ChatId}", param, chatId);
+                    logger.LogInformation("Language changed to {Lang} for chat ID: {ChatId}, Message: {Message}", param, chatId, langChangedMsg);
                     await telegramService.SendMessageToChatIdAsync(chatId, langChangedMsg, cancellationToken);
                 }
                 catch (Exception ex)
@@ -421,13 +427,23 @@ public sealed class TelegramWebhookController(
                     var statusText = newState ? (enabledText ?? "enabled") : (disabledText ?? "disabled");
                     
                     var toggleMsg = localizationService.GetString("commands.telegram_toggled", language, statusText);
-                    if (string.IsNullOrWhiteSpace(toggleMsg))
+                    
+                    // Fallback if localization returns the key itself
+                    if (toggleMsg.StartsWith("commands."))
+                    {
+                        toggleMsg = $"Telegram notifications {statusText}.";
+                    }
+                    else if (string.IsNullOrWhiteSpace(toggleMsg))
                     {
                         toggleMsg = $"Telegram notifications {statusText}.";
                     }
                     
-                    logger.LogInformation("Telegram notifications toggled to {State} for chat ID: {ChatId}", newState, chatId);
-                    await telegramService.SendMessageToChatIdAsync(chatId, toggleMsg, cancellationToken);
+                    logger.LogInformation("Telegram notifications toggled to {State} for chat ID: {ChatId}, Message: {Message}", newState, chatId, toggleMsg);
+                    
+                    // Show updated settings menu
+                    var settingsMessage = localizationService.GetString("commands.menu_settings", language);
+                    var settingsMenu = await GetSettingsMenuAsync(chatId, language, cancellationToken);
+                    await telegramService.SendMessageWithMenuAsync(chatId, toggleMsg, settingsMenu, cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -448,13 +464,23 @@ public sealed class TelegramWebhookController(
                     var emailStatusText = newEmailState ? (enabledText ?? "enabled") : (disabledText ?? "disabled");
                     
                     var emailToggleMsg = localizationService.GetString("commands.email_toggled", language, emailStatusText);
-                    if (string.IsNullOrWhiteSpace(emailToggleMsg))
+                    
+                    // Fallback if localization returns the key itself
+                    if (emailToggleMsg.StartsWith("commands."))
+                    {
+                        emailToggleMsg = $"Email notifications {emailStatusText}.";
+                    }
+                    else if (string.IsNullOrWhiteSpace(emailToggleMsg))
                     {
                         emailToggleMsg = $"Email notifications {emailStatusText}.";
                     }
                     
-                    logger.LogInformation("Email notifications toggled to {State} for chat ID: {ChatId}", newEmailState, chatId);
-                    await telegramService.SendMessageToChatIdAsync(chatId, emailToggleMsg, cancellationToken);
+                    logger.LogInformation("Email notifications toggled to {State} for chat ID: {ChatId}, Message: {Message}", newEmailState, chatId, emailToggleMsg);
+                    
+                    // Show updated settings menu
+                    var settingsMessage = localizationService.GetString("commands.menu_settings", language);
+                    var settingsMenu = await GetSettingsMenuAsync(chatId, language, cancellationToken);
+                    await telegramService.SendMessageWithMenuAsync(chatId, emailToggleMsg, settingsMenu, cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -551,12 +577,17 @@ public sealed class TelegramWebhookController(
         };
     }
 
-    private List<TelegramMenuRow> GetSettingsMenu(string language)
+    private async Task<List<TelegramMenuRow>> GetSettingsMenuAsync(string chatId, string language, CancellationToken cancellationToken)
     {
+        var settings = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
+        
         var telegramText = localizationService.GetString("commands.menu_telegram_notifications", language);
         var emailText = localizationService.GetString("commands.menu_email_alerts", language);
         var languageText = localizationService.GetString("commands.menu_language", language);
         var backText = localizationService.GetString("commands.menu_back", language);
+
+        var enabledText = localizationService.GetString("commands.enabled", language) ?? "Enabled";
+        var disabledText = localizationService.GetString("commands.disabled", language) ?? "Disabled";
 
         // Fallback to English if localization returns null/empty
         telegramText = string.IsNullOrWhiteSpace(telegramText) ? "Telegram Notifications" : telegramText;
@@ -564,7 +595,14 @@ public sealed class TelegramWebhookController(
         languageText = string.IsNullOrWhiteSpace(languageText) ? "Language" : languageText;
         backText = string.IsNullOrWhiteSpace(backText) ? "⬅️ Back" : backText;
 
-        logger.LogInformation("GetSettingsMenu - Language: {Language}, TelegramText: {TelegramText}, EmailText: {EmailText}", language, telegramText, emailText);
+        // Add current status to button text
+        var telegramStatus = settings.TelegramNotificationsEnabled ? enabledText : disabledText;
+        var emailStatus = settings.EmailNotificationsEnabled ? enabledText : disabledText;
+        
+        var telegramButtonText = $"{telegramText}: {telegramStatus}";
+        var emailButtonText = $"{emailText}: {emailStatus}";
+
+        logger.LogInformation("GetSettingsMenu - Language: {Language}, Telegram: {TelegramStatus}, Email: {EmailStatus}", language, telegramStatus, emailStatus);
 
         return new List<TelegramMenuRow>
         {
@@ -572,14 +610,14 @@ public sealed class TelegramWebhookController(
             {
                 Buttons = new List<TelegramMenuButton>
                 {
-                    new TelegramMenuButton { Text = telegramText, CallbackData = "menu:toggle_telegram" }
+                    new TelegramMenuButton { Text = telegramButtonText, CallbackData = "menu:toggle_telegram" }
                 }
             },
             new TelegramMenuRow
             {
                 Buttons = new List<TelegramMenuButton>
                 {
-                    new TelegramMenuButton { Text = emailText, CallbackData = "menu:toggle_email" }
+                    new TelegramMenuButton { Text = emailButtonText, CallbackData = "menu:toggle_email" }
                 }
             },
             new TelegramMenuRow

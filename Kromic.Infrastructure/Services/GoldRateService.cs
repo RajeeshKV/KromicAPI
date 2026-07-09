@@ -21,6 +21,8 @@ public sealed class GoldRateService(
     ITelegramService telegramService,
     ITelegramUserService telegramUserService,
     IGoldRateEmailSubscriptionService emailSubscriptionService,
+    IUserSettingsService userSettingsService,
+    ILocalizationService localizationService,
     IOptions<GoldRateOptions> options,
     ILogger<GoldRateService> logger) : IGoldRateService
 {
@@ -401,7 +403,6 @@ public sealed class GoldRateService(
     {
         var istFetchedAt = TimeZoneInfo.ConvertTime(snapshot.FetchedAt, GetIndiaTimeZone());
         var eightGramRate = snapshot.R22KT * 8;
-        var title = isLowestAlert ? "Lowest Gold Rate Found" : "Today's Gold Rate";
         
         // Calculate rate difference from yesterday
         var yesterday = GetIndiaDayRange(snapshot.FetchedAt.AddDays(-1));
@@ -432,13 +433,72 @@ public sealed class GoldRateService(
             }
         }
 
-        var message = $"<b>{title}</b>\n\n" +
-            "<b>22K Gold Rate</b>\n" +
-            $"1g: Rs. {snapshot.R22KT:N2}{rate1gChange}\n" +
-            $"8g: Rs. {eightGramRate:N2}{rate8gChange}\n" +
-            $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
+        // Get all active chat IDs
+        var chatIds = await telegramUserService.GetActiveChatIdsAsync(cancellationToken);
+        
+        // Also include configured chat IDs from environment variables
+        var configuredChatIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var chatId in _options.TelegramChatIds)
+        {
+            var trimmed = chatId?.Trim();
+            if (!string.IsNullOrWhiteSpace(trimmed))
+            {
+                configuredChatIds.Add(trimmed);
+            }
+        }
+        foreach (var chatId in _options.TelegramChatIdsCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var trimmed = chatId?.Trim();
+            if (!string.IsNullOrWhiteSpace(trimmed))
+            {
+                configuredChatIds.Add(trimmed);
+            }
+        }
+        
+        // Combine and deduplicate
+        var allChatIds = new HashSet<string>(chatIds);
+        foreach (var id in configuredChatIds)
+        {
+            allChatIds.Add(id);
+        }
 
-        await telegramService.SendMessageAsync(message, cancellationToken);
+        if (allChatIds.Count == 0)
+        {
+            logger.LogWarning("No Telegram chat IDs found for sending rate notifications.");
+            return;
+        }
+
+        // Send personalized message to each user based on their language preference
+        foreach (var chatId in allChatIds)
+        {
+            try
+            {
+                var userSettings = await userSettingsService.GetByChatIdAsync(chatId, cancellationToken);
+                var language = userSettings?.Language ?? "en";
+                
+                var title = isLowestAlert 
+                    ? localizationService.GetString("commands.lowest_gold_rate", language) 
+                    : localizationService.GetString("commands.current_rate", language);
+                
+                // Fallback if localization returns the key itself
+                if (title.StartsWith("commands."))
+                {
+                    title = isLowestAlert ? "Lowest Gold Rate Found" : "Today's Gold Rate";
+                }
+
+                var message = $"<b>{title}</b>\n\n" +
+                    "<b>22K Gold Rate</b>\n" +
+                    $"1g: Rs. {snapshot.R22KT:N2}{rate1gChange}\n" +
+                    $"8g: Rs. {eightGramRate:N2}{rate8gChange}\n" +
+                    $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
+
+                await telegramService.SendMessageToChatIdAsync(chatId, message, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to send Telegram rate notification to chat ID: {ChatId}", chatId);
+            }
+        }
     }
     private async Task SyncConfiguredTelegramUsersAsync(CancellationToken cancellationToken)
     {

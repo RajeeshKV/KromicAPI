@@ -457,6 +457,19 @@ public sealed class TelegramWebhookController(
                 {
                     var currentEmailSettings = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
                     var newEmailState = !currentEmailSettings.EmailNotificationsEnabled;
+                    
+                    // If enabling email notifications, check if user has an email stored
+                    if (newEmailState)
+                    {
+                        var emailSubscription = await emailSubscriptionService.GetByChatIdAsync(chatId, cancellationToken);
+                        if (emailSubscription == null || string.IsNullOrWhiteSpace(emailSubscription.Email))
+                        {
+                            // No email stored, prompt for email input
+                            await StartEmailAlertsSubscriptionAsync(chatId, cancellationToken, language);
+                            return;
+                        }
+                    }
+                    
                     await userSettingsService.SetEmailNotificationsAsync(chatId, newEmailState, cancellationToken);
                     
                     var enabledText = localizationService.GetString("commands.enabled", language);
@@ -1097,7 +1110,7 @@ public sealed class TelegramWebhookController(
             }
 
             var sortedDates = dateGrouped.Keys.ToList();
-            sortedDates.Sort();
+            sortedDates.Sort((a, b) => b.CompareTo(a));
 
             var tableHeader = $"<b>{localizationService.GetString("commands.last_30_days", language)}</b>\n\n";
             tableHeader += "<code>Date          | 1g 22K | 8g 22K\n";

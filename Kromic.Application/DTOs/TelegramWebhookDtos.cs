@@ -121,6 +121,12 @@ public sealed class BroadcastRequest
     public string Message { get; set; } = string.Empty;
 }
 
+public sealed class LocalizedBroadcastRequest
+{
+    public string EnglishMessage { get; set; } = string.Empty;
+    public string MalayalamMessage { get; set; } = string.Empty;
+}
+
 public sealed record TelegramFeedbackNotification(
     string ChatId,
     string? FirstName,

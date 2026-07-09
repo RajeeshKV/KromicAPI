@@ -282,24 +282,38 @@ public sealed class TelegramWebhookController(
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(callbackQuery.Id))
+        {
+            logger.LogWarning("Callback query ID is null or empty for ChatId: {ChatId}", chatId);
+            return;
+        }
+
         var settings = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
         var language = settings.Language;
         var callbackData = callbackQuery.Data ?? string.Empty;
 
-        // Acknowledge the callback
-        await telegramService.AnswerCallbackQueryAsync(callbackQuery.Id, cancellationToken: cancellationToken);
+        logger.LogInformation("Processing callback query - ChatId: {ChatId}, CallbackId: {CallbackId}, Data: {Data}", chatId, callbackQuery.Id, callbackData);
+
+        // Acknowledge the callback without showing text to avoid "Null" display
+        var answerResult = await telegramService.AnswerCallbackQueryAsync(callbackQuery.Id, cancellationToken: cancellationToken);
+        if (!answerResult)
+        {
+            logger.LogWarning("Failed to answer callback query for ChatId: {ChatId}", chatId);
+        }
 
         // Parse callback data: format "menu:level:action"
         var parts = callbackData.Split(':');
         if (parts.Length < 2)
         {
-            logger.LogWarning("Invalid callback data format: {Data}", callbackData);
+            logger.LogWarning("Invalid callback data format: {Data}, Parts count: {Count}", callbackData, parts.Length);
             return;
         }
 
         var action = parts[0];
         var level = parts.Length > 1 ? parts[1] : string.Empty;
         var param = parts.Length > 2 ? parts[2] : string.Empty;
+
+        logger.LogInformation("Parsed callback - Action: {Action}, Level: {Level}, Param: {Param}", action, level, param);
 
         if (action == "menu")
         {
@@ -309,10 +323,14 @@ public sealed class TelegramWebhookController(
 
     private async Task HandleMenuNavigationAsync(string chatId, string level, string param, string language, CancellationToken cancellationToken)
     {
-        var menu = new List<TelegramMenuRow>();
-        string message;
+        try
+        {
+            logger.LogInformation("Handling menu navigation - ChatId: {ChatId}, Level: {Level}, Param: {Param}, Language: {Language}", chatId, level, param, language);
+            
+            var menu = new List<TelegramMenuRow>();
+            string message;
 
-        switch (level)
+            switch (level)
         {
             case "main":
                 message = localizationService.GetString("commands.menu_main", language);
@@ -355,32 +373,94 @@ public sealed class TelegramWebhookController(
                 return;
 
             case "language":
-                await ShowLanguageMenuAsync(chatId, language, cancellationToken);
+                try
+                {
+                    await ShowLanguageMenuAsync(chatId, language, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error showing language menu for chat ID: {ChatId}", chatId);
+                    await telegramService.SendMessageToChatIdAsync(chatId, "Error showing language menu. Please try again.", cancellationToken);
+                }
                 return;
 
             case "setlang":
-                await userSettingsService.UpdateLanguageAsync(chatId, param, cancellationToken);
-                var langName = param == "en" ? localizationService.GetString("commands.english", language) : localizationService.GetString("commands.malayalam", language);
-                var langChangedMsg = localizationService.GetString("commands.language_changed", language, langName);
-                await telegramService.SendMessageToChatIdAsync(chatId, langChangedMsg, cancellationToken);
+                try
+                {
+                    await userSettingsService.UpdateLanguageAsync(chatId, param, cancellationToken);
+                    
+                    var englishText = localizationService.GetString("commands.english", language);
+                    var malayalamText = localizationService.GetString("commands.malayalam", language);
+                    var langName = param == "en" ? (englishText ?? "English") : (malayalamText ?? "Malayalam");
+                    
+                    var langChangedMsg = localizationService.GetString("commands.language_changed", language, langName);
+                    if (string.IsNullOrWhiteSpace(langChangedMsg))
+                    {
+                        langChangedMsg = $"Language changed to {langName}.";
+                    }
+                    
+                    logger.LogInformation("Language changed to {Lang} for chat ID: {ChatId}", param, chatId);
+                    await telegramService.SendMessageToChatIdAsync(chatId, langChangedMsg, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error setting language for chat ID: {ChatId}, Param: {Param}", chatId, param);
+                    await telegramService.SendMessageToChatIdAsync(chatId, "Error setting language. Please try again.", cancellationToken);
+                }
                 return;
 
             case "toggle_telegram":
-                var currentSettings = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
-                var newState = !currentSettings.TelegramNotificationsEnabled;
-                await userSettingsService.SetTelegramNotificationsAsync(chatId, newState, cancellationToken);
-                var statusText = newState ? localizationService.GetString("commands.enabled", language) : localizationService.GetString("commands.disabled", language);
-                var toggleMsg = localizationService.GetString("commands.telegram_toggled", language, statusText);
-                await telegramService.SendMessageToChatIdAsync(chatId, toggleMsg, cancellationToken);
+                try
+                {
+                    var currentSettings = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
+                    var newState = !currentSettings.TelegramNotificationsEnabled;
+                    await userSettingsService.SetTelegramNotificationsAsync(chatId, newState, cancellationToken);
+                    
+                    var enabledText = localizationService.GetString("commands.enabled", language);
+                    var disabledText = localizationService.GetString("commands.disabled", language);
+                    var statusText = newState ? (enabledText ?? "enabled") : (disabledText ?? "disabled");
+                    
+                    var toggleMsg = localizationService.GetString("commands.telegram_toggled", language, statusText);
+                    if (string.IsNullOrWhiteSpace(toggleMsg))
+                    {
+                        toggleMsg = $"Telegram notifications {statusText}.";
+                    }
+                    
+                    logger.LogInformation("Telegram notifications toggled to {State} for chat ID: {ChatId}", newState, chatId);
+                    await telegramService.SendMessageToChatIdAsync(chatId, toggleMsg, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error toggling Telegram notifications for chat ID: {ChatId}", chatId);
+                    await telegramService.SendMessageToChatIdAsync(chatId, "Error toggling Telegram notifications. Please try again.", cancellationToken);
+                }
                 return;
 
             case "toggle_email":
-                var currentEmailSettings = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
-                var newEmailState = !currentEmailSettings.EmailNotificationsEnabled;
-                await userSettingsService.SetEmailNotificationsAsync(chatId, newEmailState, cancellationToken);
-                var emailStatusText = newEmailState ? localizationService.GetString("commands.enabled", language) : localizationService.GetString("commands.disabled", language);
-                var emailToggleMsg = localizationService.GetString("commands.email_toggled", language, emailStatusText);
-                await telegramService.SendMessageToChatIdAsync(chatId, emailToggleMsg, cancellationToken);
+                try
+                {
+                    var currentEmailSettings = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
+                    var newEmailState = !currentEmailSettings.EmailNotificationsEnabled;
+                    await userSettingsService.SetEmailNotificationsAsync(chatId, newEmailState, cancellationToken);
+                    
+                    var enabledText = localizationService.GetString("commands.enabled", language);
+                    var disabledText = localizationService.GetString("commands.disabled", language);
+                    var emailStatusText = newEmailState ? (enabledText ?? "enabled") : (disabledText ?? "disabled");
+                    
+                    var emailToggleMsg = localizationService.GetString("commands.email_toggled", language, emailStatusText);
+                    if (string.IsNullOrWhiteSpace(emailToggleMsg))
+                    {
+                        emailToggleMsg = $"Email notifications {emailStatusText}.";
+                    }
+                    
+                    logger.LogInformation("Email notifications toggled to {State} for chat ID: {ChatId}", newEmailState, chatId);
+                    await telegramService.SendMessageToChatIdAsync(chatId, emailToggleMsg, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error toggling email notifications for chat ID: {ChatId}", chatId);
+                    await telegramService.SendMessageToChatIdAsync(chatId, "Error toggling email notifications. Please try again.", cancellationToken);
+                }
                 return;
 
             case "date_pick":
@@ -398,6 +478,12 @@ public sealed class TelegramWebhookController(
         }
 
         await telegramService.SendMessageWithMenuAsync(chatId, message, menu, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error handling menu navigation - ChatId: {ChatId}, Level: {Level}, Param: {Param}", chatId, level, param);
+            await telegramService.SendMessageToChatIdAsync(chatId, "Error processing your request. Please try again.", cancellationToken);
+        }
     }
 
     private List<TelegramMenuRow> GetMainMenu(string language)
@@ -467,34 +553,47 @@ public sealed class TelegramWebhookController(
 
     private List<TelegramMenuRow> GetSettingsMenu(string language)
     {
+        var telegramText = localizationService.GetString("commands.menu_telegram_notifications", language);
+        var emailText = localizationService.GetString("commands.menu_email_alerts", language);
+        var languageText = localizationService.GetString("commands.menu_language", language);
+        var backText = localizationService.GetString("commands.menu_back", language);
+
+        // Fallback to English if localization returns null/empty
+        telegramText = string.IsNullOrWhiteSpace(telegramText) ? "Telegram Notifications" : telegramText;
+        emailText = string.IsNullOrWhiteSpace(emailText) ? "Email Alerts" : emailText;
+        languageText = string.IsNullOrWhiteSpace(languageText) ? "Language" : languageText;
+        backText = string.IsNullOrWhiteSpace(backText) ? "⬅️ Back" : backText;
+
+        logger.LogInformation("GetSettingsMenu - Language: {Language}, TelegramText: {TelegramText}, EmailText: {EmailText}", language, telegramText, emailText);
+
         return new List<TelegramMenuRow>
         {
             new TelegramMenuRow
             {
                 Buttons = new List<TelegramMenuButton>
                 {
-                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_telegram_notifications", language), CallbackData = "menu:toggle_telegram" }
+                    new TelegramMenuButton { Text = telegramText, CallbackData = "menu:toggle_telegram" }
                 }
             },
             new TelegramMenuRow
             {
                 Buttons = new List<TelegramMenuButton>
                 {
-                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_email_alerts", language), CallbackData = "menu:toggle_email" }
+                    new TelegramMenuButton { Text = emailText, CallbackData = "menu:toggle_email" }
                 }
             },
             new TelegramMenuRow
             {
                 Buttons = new List<TelegramMenuButton>
                 {
-                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_language", language), CallbackData = "menu:language" }
+                    new TelegramMenuButton { Text = languageText, CallbackData = "menu:language" }
                 }
             },
             new TelegramMenuRow
             {
                 Buttons = new List<TelegramMenuButton>
                 {
-                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_back", language), CallbackData = "menu:main" }
+                    new TelegramMenuButton { Text = backText, CallbackData = "menu:main" }
                 }
             }
         };

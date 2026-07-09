@@ -57,8 +57,22 @@ public sealed class LocalizationService : ILocalizationService
 
     public string GetString(string key, string language, params object[] args)
     {
-        var template = GetString(key, language);
-        return string.Format(template, args);
+        try
+        {
+            var template = GetString(key, language);
+            var result = string.Format(template, args);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error formatting localization string for key: {Key}, language: {Language}", key, language);
+            // Return a fallback message with the args
+            if (args != null && args.Length > 0)
+            {
+                return $"{key}: {string.Join(", ", args)}";
+            }
+            return key;
+        }
     }
 
     private void LoadResourcesFromDatabase()

@@ -220,6 +220,12 @@ public sealed class TelegramService(
             return false;
         }
 
+        if (string.IsNullOrWhiteSpace(callbackQueryId))
+        {
+            logger.LogWarning("Callback query ID is null or empty.");
+            return false;
+        }
+
         try
         {
             var payload = new

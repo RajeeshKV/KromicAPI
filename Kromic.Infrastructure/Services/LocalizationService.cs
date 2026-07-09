@@ -1,18 +1,20 @@
 using System.Text.Json;
 using Kromic.Application.Interfaces;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
 
 namespace Kromic.Infrastructure.Services;
 
 public sealed class LocalizationService : ILocalizationService
 {
     private readonly Dictionary<string, Dictionary<string, string>> _resources = new();
-    private readonly string _resourcesPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources");
+    private readonly string _resourcesPath;
     private readonly ILogger<LocalizationService> _logger;
 
-    public LocalizationService(ILogger<LocalizationService> logger)
+    public LocalizationService(IHostEnvironment environment, ILogger<LocalizationService> logger)
     {
         _logger = logger;
+        _resourcesPath = Path.Combine(environment.ContentRootPath, "Resources");
         LoadResources();
     }
 

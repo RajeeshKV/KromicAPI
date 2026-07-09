@@ -170,45 +170,26 @@ public sealed class TelegramConfigurationService(
 
     private async Task SetChatMenuButtonAsync(CancellationToken cancellationToken)
     {
-        var payload = new
-        {
-            menu_button = new
-            {
-                type = "commands"
-            }
-        };
-
-        var url = $"https://api.telegram.org/bot{_options.TelegramBotToken}/setChatMenuButton";
+        // Delete the menu button entirely - users will use inline menu buttons instead
+        var url = $"https://api.telegram.org/bot{_options.TelegramBotToken}/deleteChatMenuButton";
         using var httpClient = new HttpClient();
-        using var response = await httpClient.PostAsJsonAsync(url, payload, cancellationToken);
+        using var response = await httpClient.PostAsync(url, null, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
             var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-            logger.LogWarning("Failed to set ChatMenuButton: {Error}", errorContent);
+            logger.LogWarning("Failed to delete ChatMenuButton: {Error}", errorContent);
         }
         else
         {
-            logger.LogInformation("Set Telegram chat menu button successfully");
+            logger.LogInformation("Deleted Telegram chat menu button successfully");
         }
     }
 
     private List<(string Command, string Description)> GetBotCommands()
     {
-        return new List<(string, string)>
-        {
-            ("start", "Start the bot and get current rate"),
-            ("currentrate", "Get current gold rate"),
-            ("lastonemonthrates", "View last 30 days rates"),
-            ("highestlowest", "View highest & lowest rates (30 days)"),
-            ("history", "View historical rates by date"),
-            ("emailalerts", "Subscribe to email alerts"),
-            ("unsubscribeemail", "Unsubscribe from email alerts"),
-            ("settings", "Manage notification settings"),
-            ("pause", "Pause Telegram notifications"),
-            ("resume", "Resume Telegram notifications"),
-            ("feedback", "Send feedback to admin"),
-            ("help", "Show available commands")
-        };
+        // Return empty list to remove commands from menu
+        // Users can still use inline menu buttons for all functionality
+        return new List<(string, string)>();
     }
 }

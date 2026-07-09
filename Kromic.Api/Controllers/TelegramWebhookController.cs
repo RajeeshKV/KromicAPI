@@ -360,8 +360,8 @@ public sealed class TelegramWebhookController(
 
             case "setlang":
                 await userSettingsService.UpdateLanguageAsync(chatId, param, cancellationToken);
-                var langChangedMsg = localizationService.GetString("commands.language_changed", language, 
-                    param == "en" ? localizationService.GetString("commands.english", language) : localizationService.GetString("commands.malayalam", language));
+                var langName = param == "en" ? localizationService.GetString("commands.english", language) : localizationService.GetString("commands.malayalam", language);
+                var langChangedMsg = localizationService.GetString("commands.language_changed", language, langName);
                 await telegramService.SendMessageToChatIdAsync(chatId, langChangedMsg, cancellationToken);
                 return;
 
@@ -369,8 +369,8 @@ public sealed class TelegramWebhookController(
                 var currentSettings = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
                 var newState = !currentSettings.TelegramNotificationsEnabled;
                 await userSettingsService.SetTelegramNotificationsAsync(chatId, newState, cancellationToken);
-                var toggleMsg = localizationService.GetString("commands.telegram_toggled", language, 
-                    newState ? localizationService.GetString("commands.enabled", language) : localizationService.GetString("commands.disabled", language));
+                var statusText = newState ? localizationService.GetString("commands.enabled", language) : localizationService.GetString("commands.disabled", language);
+                var toggleMsg = localizationService.GetString("commands.telegram_toggled", language, statusText);
                 await telegramService.SendMessageToChatIdAsync(chatId, toggleMsg, cancellationToken);
                 return;
 
@@ -378,8 +378,8 @@ public sealed class TelegramWebhookController(
                 var currentEmailSettings = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
                 var newEmailState = !currentEmailSettings.EmailNotificationsEnabled;
                 await userSettingsService.SetEmailNotificationsAsync(chatId, newEmailState, cancellationToken);
-                var emailToggleMsg = localizationService.GetString("commands.email_toggled", language, 
-                    newEmailState ? localizationService.GetString("commands.enabled", language) : localizationService.GetString("commands.disabled", language));
+                var emailStatusText = newEmailState ? localizationService.GetString("commands.enabled", language) : localizationService.GetString("commands.disabled", language);
+                var emailToggleMsg = localizationService.GetString("commands.email_toggled", language, emailStatusText);
                 await telegramService.SendMessageToChatIdAsync(chatId, emailToggleMsg, cancellationToken);
                 return;
 

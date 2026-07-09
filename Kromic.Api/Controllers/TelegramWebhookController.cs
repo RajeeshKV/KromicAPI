@@ -78,9 +78,19 @@ public sealed class TelegramWebhookController(
                 }
                 else if (!string.IsNullOrWhiteSpace(messageText))
                 {
-                    if (!await TryCompleteFeedbackAsync(chatId, request.Message.From, messageText, cancellationToken))
+                    // Check if user is in the middle of feedback capture or email subscription
+                    var feedbackCompleted = await TryCompleteFeedbackAsync(chatId, request.Message.From, messageText, cancellationToken);
+                    if (!feedbackCompleted)
                     {
                         await TryCompleteEmailAlertsSubscriptionAsync(chatId, messageText, cancellationToken);
+                        {
+                            // Not in any capture flow, show menu
+                            var settings = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
+                            var language = settings.Language;
+                            var menu = GetMainMenu(language);
+                            var message = localizationService.GetString("commands.menu_main", language);
+                            await telegramService.SendMessageWithMenuAsync(chatId, message, menu, cancellationToken);
+                        }
                     }
                 }
             }
@@ -134,6 +144,62 @@ public sealed class TelegramWebhookController(
     {
         var count = await telegramUserService.GetActiveChatCountAsync(cancellationToken);
         return Ok(new { activeUsers = count });
+    }
+
+    [HttpPost("broadcast")]
+    public async Task<IActionResult> Broadcast([FromBody] BroadcastRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Message))
+        {
+            return BadRequest(new { error = "Message is required" });
+        }
+
+        try
+        {
+            var chatIds = await telegramUserService.GetActiveChatIdsAsync(cancellationToken);
+            var successCount = 0;
+            var failureCount = 0;
+
+            foreach (var chatId in chatIds)
+            {
+                try
+                {
+                    var sent = await telegramService.SendMessageToChatIdAsync(chatId, request.Message, cancellationToken);
+                    if (sent)
+                    {
+                        successCount++;
+                    }
+                    else
+                    {
+                        failureCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failureCount++;
+                    logger.LogError(ex, "Failed to send broadcast to chat {ChatId}", chatId);
+                }
+            }
+
+            logger.LogInformation(
+                "Broadcast sent to {Total} users. Success: {Success}, Failed: {Failure}",
+                chatIds.Count,
+                successCount,
+                failureCount);
+
+            return Ok(new
+            {
+                totalUsers = chatIds.Count,
+                successCount,
+                failureCount,
+                message = request.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error sending broadcast");
+            return StatusCode(500, new { error = "Failed to send broadcast" });
+        }
     }
 
     private async Task HandleCommandAsync(

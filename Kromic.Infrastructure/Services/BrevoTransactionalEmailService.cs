@@ -123,6 +123,92 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
         return SendAsync(request, cancellationToken);
     }
 
+    public Task<string?> SendGoldRateEmailAsync(
+        string toEmail,
+        string toName,
+        string subject,
+        string heading,
+        string rate1g,
+        string rate8g,
+        string change,
+        string change8g,
+        string changeClass,
+        string fetchedAt,
+        CancellationToken cancellationToken)
+    {
+        EnsureConfigured(_options.CustomEmailTemplateId);
+
+        var request = CreateTemplateRequest(
+            toEmail,
+            toName,
+            _options.CustomEmailTemplateId,
+            new
+            {
+                name = toName,
+                email = toEmail,
+                subject,
+                heading,
+                rate1g,
+                rate8g,
+                change,
+                change8g,
+                changeClass,
+                fetchedAt,
+                sentAt = DateTimeOffset.UtcNow
+            },
+            subject: subject);
+
+        return SendAsync(request, cancellationToken);
+    }
+
+    public Task<string?> SendWeeklySummaryEmailStructuredAsync(
+        string toEmail,
+        string toName,
+        string subject,
+        string heading,
+        string startDate,
+        string endDate,
+        string averageRate,
+        string highestRate,
+        string highestDate,
+        string lowestRate,
+        string lowestDate,
+        string trend,
+        string trendAmount,
+        string trendClass,
+        string currentRate,
+        CancellationToken cancellationToken)
+    {
+        EnsureConfigured(_options.WeeklySummaryEmailTemplateId);
+
+        var request = CreateTemplateRequest(
+            toEmail,
+            toName,
+            _options.WeeklySummaryEmailTemplateId,
+            new
+            {
+                name = toName,
+                email = toEmail,
+                subject,
+                heading,
+                startDate,
+                endDate,
+                averageRate,
+                highestRate,
+                highestDate,
+                lowestRate,
+                lowestDate,
+                trend,
+                trendAmount,
+                trendClass,
+                currentRate,
+                sentAt = DateTimeOffset.UtcNow
+            },
+            subject: subject);
+
+        return SendAsync(request, cancellationToken);
+    }
+
 
     public Task<string?> SendTelegramFeedbackAsync(
         TelegramFeedbackNotification feedback,

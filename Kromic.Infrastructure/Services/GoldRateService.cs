@@ -294,58 +294,85 @@ public sealed class GoldRateService(
             ? "This is the lowest saved 22K rate. Buy gold now."
             : "Today's 22K gold rate";
         var eightGramRate = snapshot.R22KT * 8;
-        var body = string.Join(Environment.NewLine, [
-            $"22K Gold Rate (1g): Rs. {snapshot.R22KT:N2}",
-            $"22K Gold Rate (8g): Rs. {eightGramRate:N2}",
-            $"Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST",
-            snapshot.SourceLastUpdatedAt.HasValue
-                ? $"Source updated at: {TimeZoneInfo.ConvertTime(snapshot.SourceLastUpdatedAt.Value, GetIndiaTimeZone()):dd MMM yyyy, hh:mm tt} IST"
-                : "Source updated at: unavailable"
-        ]);
+
+        // Calculate rate difference from yesterday for structured email params
+        var yesterday = GetIndiaDayRange(snapshot.FetchedAt.AddDays(-1));
+        var yesterdayRate = await dbContext.GoldRateSnapshots
+            .AsNoTracking()
+            .Where(x => x.FetchedAt >= yesterday.StartUtc && x.FetchedAt < yesterday.EndUtc)
+            .OrderByDescending(x => x.FetchedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var rate1gStr = $"Rs. {snapshot.R22KT:N2}";
+        var rate8gStr = $"Rs. {eightGramRate:N2}";
+        var change = string.Empty;
+        var change8g = string.Empty;
+        var changeClass = "rate-change-stable";
+
+        if (yesterdayRate != null)
+        {
+            var diff = snapshot.R22KT - yesterdayRate.R22KT;
+            var diff8g = diff * 8;
+            
+            if (diff > 0)
+            {
+                change = $"🔺+{diff:N2}";
+                change8g = $"🔺+{diff8g:N2}";
+                changeClass = "rate-change-up";
+            }
+            else if (diff < 0)
+            {
+                change = $"🔻{diff:N2}";
+                change8g = $"🔻{diff8g:N2}";
+                changeClass = "rate-change-down";
+            }
+            else
+            {
+                change = "➡️ 0.00";
+                change8g = "➡️ 0.00";
+            }
+        }
+
+        var fetchedAtStr = $"{istFetchedAt:dd MMM yyyy, hh:mm tt} IST";
 
         var messageIds = new List<string>();
         var recipients = ResolveRecipients();
-        if (recipients.Count == 0)
+        foreach (var recipient in recipients)
         {
-            var messageId = await emailService.SendAdminNotificationAsync(subject, heading, body, cancellationToken);
+            var recipientName = string.IsNullOrWhiteSpace(_options.RecipientName) ? recipient : _options.RecipientName;
+            var messageId = await emailService.SendGoldRateEmailAsync(
+                recipient,
+                recipientName,
+                subject,
+                heading,
+                rate1gStr,
+                rate8gStr,
+                change,
+                change8g,
+                changeClass,
+                fetchedAtStr,
+                cancellationToken);
+
             if (!string.IsNullOrWhiteSpace(messageId))
             {
                 messageIds.Add(messageId);
-            }
-        }
-        else
-        {
-            foreach (var recipient in recipients)
-            {
-                var messageId = await emailService.SendCustomEmailAsync(
-                    recipient,
-                    string.IsNullOrWhiteSpace(_options.RecipientName) ? recipient : _options.RecipientName,
-                    subject,
-                    heading,
-                    body,
-                    null,
-                    null,
-                    cancellationToken);
-
-                if (!string.IsNullOrWhiteSpace(messageId))
-                {
-                    messageIds.Add(messageId);
-                }
             }
         }
 
         var subscribers = await emailSubscriptionService.GetActiveSubscribersAsync(cancellationToken);
         foreach (var subscriber in subscribers)
         {
-            var unsubscribeUrl = BuildUnsubscribeUrl(subscriber.UnsubscribeToken);
-            var messageId = await emailService.SendCustomEmailAsync(
+            var messageId = await emailService.SendGoldRateEmailAsync(
                 subscriber.Email,
                 subscriber.Email,
                 subject,
                 heading,
-                body,
-                unsubscribeUrl is null ? null : "Unsubscribe",
-                unsubscribeUrl,
+                rate1gStr,
+                rate8gStr,
+                change,
+                change8g,
+                changeClass,
+                fetchedAtStr,
                 cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(messageId))

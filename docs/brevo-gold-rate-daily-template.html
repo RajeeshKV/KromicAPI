@@ -64,20 +64,55 @@
         background: #fbfdfc;
       }
 
-      .rate-label {
-        padding: 16px 20px 0;
+      .rate-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .rate-table th {
+        padding: 12px 20px;
+        text-align: left;
         color: #5d6f68;
         font-size: 13px;
         font-weight: 700;
         text-transform: uppercase;
+        border-bottom: 1px solid #d9e4de;
       }
 
-      .rate-value {
-        padding: 6px 20px 18px;
+      .rate-table td {
+        padding: 16px 20px;
         color: #0f2f28;
-        font-size: 34px;
-        line-height: 1.15;
+        font-size: 16px;
+        font-weight: 600;
+        border-bottom: 1px solid #e8f0ec;
+      }
+
+      .rate-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .rate-amount {
+        font-size: 24px;
         font-weight: 700;
+        color: #0f2f28;
+      }
+
+      .rate-change {
+        font-size: 16px;
+        font-weight: 600;
+        margin-left: 8px;
+      }
+
+      .rate-change-up {
+        color: #2e7d32;
+      }
+
+      .rate-change-down {
+        color: #c62828;
+      }
+
+      .rate-change-stable {
+        color: #5d6f68;
       }
 
       .body-text {
@@ -134,10 +169,22 @@
               <td class="content">
                 <table role="presentation" class="rate-card" width="100%">
                   <tr>
-                    <td class="rate-label">Focused rate</td>
-                  </tr>
-                  <tr>
-                    <td class="rate-value">R22KT</td>
+                    <td>
+                      <table role="presentation" class="rate-table" width="100%">
+                        <tr>
+                          <th>Weight</th>
+                          <th>Rate</th>
+                        </tr>
+                        <tr>
+                          <td>1 Gram</td>
+                          <td><span class="rate-amount">{{ params.rate1g }}</span> <span class="rate-change {{ params.changeClass }}">{{ params.change }}</span></td>
+                        </tr>
+                        <tr>
+                          <td>8 Grams</td>
+                          <td><span class="rate-amount">{{ params.rate8g }}</span> <span class="rate-change {{ params.changeClass }}">{{ params.change8g }}</span></td>
+                        </tr>
+                      </table>
+                    </td>
                   </tr>
                 </table>
 

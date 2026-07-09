@@ -115,6 +115,12 @@ public class TelegramCallbackQuery
     [JsonPropertyName("data")]
     public string? Data { get; set; }
 }
+
+public sealed class BroadcastRequest
+{
+    public string Message { get; set; } = string.Empty;
+}
+
 public sealed record TelegramFeedbackNotification(
     string ChatId,
     string? FirstName,

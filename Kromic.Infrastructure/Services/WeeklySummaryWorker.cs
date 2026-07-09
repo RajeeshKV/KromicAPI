@@ -118,22 +118,24 @@ public sealed class WeeklySummaryWorker(
                 try
                 {
                     var subject = $"Weekly Gold Rate Summary - {now:dd MMM yyyy}";
-                    var body = $"Weekly Gold Rate Summary\n\n" +
-                               $"Period: {sevenDaysAgo:dd MMM yyyy} - {now:dd MMM yyyy}\n\n" +
-                               $"Average Rate: Rs. {avgRate:N2}\n" +
-                               $"Highest: Rs. {maxRate:N2} ({maxIstDate:dd MMM})\n" +
-                               $"Lowest: Rs. {minRate:N2} ({minIstDate:dd MMM})\n" +
-                               $"Weekly Trend: {trend} ({trendAmount:N2})\n" +
-                               $"Current: Rs. {lastRate:N2}";
+                    var trendClass = trend.Contains("Up") ? "trend-up" : trend.Contains("Down") ? "trend-down" : "trend-stable";
 
-                    await emailService.SendWeeklySummaryEmailAsync(
+                    await emailService.SendWeeklySummaryEmailStructuredAsync(
                         subscriber.Email,
                         subscriber.Email,
                         subject,
                         "Weekly Gold Rate Summary",
-                        body,
-                        null,
-                        null,
+                        $"{sevenDaysAgo:dd MMM yyyy}",
+                        $"{now:dd MMM yyyy}",
+                        $"Rs. {avgRate:N2}",
+                        $"Rs. {maxRate:N2}",
+                        $"{maxIstDate:dd MMM yyyy}",
+                        $"Rs. {minRate:N2}",
+                        $"{minIstDate:dd MMM yyyy}",
+                        trend,
+                        $"Rs. {trendAmount:N2}",
+                        trendClass,
+                        $"Rs. {lastRate:N2}",
                         cancellationToken);
                 }
                 catch (Exception ex)

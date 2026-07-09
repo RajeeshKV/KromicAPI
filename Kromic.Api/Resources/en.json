@@ -41,6 +41,8 @@
     "malayalam": "Malayalam",
     "language_changed": "Language changed to {Language}.",
     "telegram_toggled": "Telegram notifications {Status}.",
-    "email_toggled": "Email notifications {Status}."
+    "email_toggled": "Email notifications {Status}.",
+    "emailalerts": "Please enter your email address to subscribe to email alerts:",
+    "feedback": "Please send your feedback message. I'll forward it to the admin."
   }
 }

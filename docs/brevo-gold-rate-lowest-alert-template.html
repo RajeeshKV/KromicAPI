@@ -64,24 +64,59 @@
         background: #fff9e9;
       }
 
-      .alert-label {
-        padding: 18px 20px 0;
+      .alert-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .alert-table th {
+        padding: 12px 20px;
+        text-align: left;
         color: #7b5b13;
         font-size: 13px;
         font-weight: 700;
         text-transform: uppercase;
+        border-bottom: 1px solid #e8c878;
       }
 
-      .alert-value {
-        padding: 8px 20px 6px;
+      .alert-table td {
+        padding: 16px 20px;
         color: #2f210d;
-        font-size: 32px;
-        line-height: 1.15;
+        font-size: 16px;
+        font-weight: 600;
+        border-bottom: 1px solid #f0e0b0;
+      }
+
+      .alert-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .alert-amount {
+        font-size: 24px;
         font-weight: 700;
+        color: #2f210d;
+      }
+
+      .alert-change {
+        font-size: 16px;
+        font-weight: 600;
+        margin-left: 8px;
+      }
+
+      .alert-change-up {
+        color: #2e7d32;
+      }
+
+      .alert-change-down {
+        color: #c62828;
+      }
+
+      .alert-change-stable {
+        color: #7b5b13;
       }
 
       .alert-note {
-        padding: 0 20px 18px;
+        padding: 8px 20px 16px;
         color: #5c4314;
         font-size: 15px;
         line-height: 1.5;
@@ -142,10 +177,22 @@
               <td class="content">
                 <table role="presentation" class="alert-card" width="100%">
                   <tr>
-                    <td class="alert-label">Action signal</td>
-                  </tr>
-                  <tr>
-                    <td class="alert-value">R22KT is at the lowest saved rate</td>
+                    <td>
+                      <table role="presentation" class="alert-table" width="100%">
+                        <tr>
+                          <th>Weight</th>
+                          <th>Rate</th>
+                        </tr>
+                        <tr>
+                          <td>1 Gram</td>
+                          <td><span class="alert-amount">{{ params.rate1g }}</span> <span class="alert-change {{ params.changeClass }}">{{ params.change }}</span></td>
+                        </tr>
+                        <tr>
+                          <td>8 Grams</td>
+                          <td><span class="alert-amount">{{ params.rate8g }}</span> <span class="alert-change {{ params.changeClass }}">{{ params.change8g }}</span></td>
+                        </tr>
+                      </table>
+                    </td>
                   </tr>
                   <tr>
                     <td class="alert-note">Buy gold now.</td>

@@ -11,6 +11,7 @@ public sealed class BrevoOptions
     public int ContactNotificationTemplateId { get; set; }
     public int ContactResponseTemplateId { get; set; }
     public int CustomEmailTemplateId { get; set; }
+    public int WeeklySummaryEmailTemplateId { get; set; }
     public int FeedbackTemplateId { get; set; }
     public string FeedbackRecipientEmail { get; set; } = "rajeeshkva2z@gmail.com";
     public string FeedbackRecipientName { get; set; } = "Rajeesh";

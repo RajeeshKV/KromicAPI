@@ -4,6 +4,7 @@ using Kromic.Api.Middleware;
 using Kromic.Infrastructure;
 using Kromic.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Kromic.Application.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -67,6 +68,13 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<KromicDbContext>();
     await dbContext.Database.MigrateAsync();
+
+    // Apply Telegram bot configuration
+    var telegramConfigService = scope.ServiceProvider.GetService<ITelegramConfigurationService>();
+    if (telegramConfigService != null)
+    {
+        await telegramConfigService.ApplyConfigurationAsync(CancellationToken.None);
+    }
 }
 
 if (args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase))

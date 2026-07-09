@@ -122,4 +122,11 @@ public sealed class GoldRateEmailSubscriptionService(KromicDbContext dbContext) 
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
+
+    public async Task<GoldRateEmailSubscription?> GetByChatIdAsync(string chatId, CancellationToken cancellationToken)
+    {
+        return await dbContext.GoldRateEmailSubscriptions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.ChatId == chatId, cancellationToken);
+    }
 }

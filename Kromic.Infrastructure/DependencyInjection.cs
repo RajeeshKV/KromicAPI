@@ -35,8 +35,12 @@ public static class DependencyInjection
         services.AddScoped<ICloudinaryImageService, CloudinaryImageService>();
         services.AddScoped<ITelegramUserService, TelegramUserService>();
         services.AddScoped<IGoldRateEmailSubscriptionService, GoldRateEmailSubscriptionService>();
+        services.AddScoped<IUserSettingsService, UserSettingsService>();
+        services.AddSingleton<ILocalizationService, LocalizationService>();
+        services.AddSingleton<ITelegramConfigurationService, TelegramConfigurationService>();
         services.AddSingleton<IPortfolioCache, MemoryPortfolioCache>();
         services.AddHostedService<GoldRateDailyWorker>();
+        services.AddHostedService<WeeklySummaryWorker>();
         services.AddHttpClient<IGoldRateService, GoldRateService>();
         services.AddHttpClient<ITelegramService, TelegramService>();
         services.AddHttpClient<ITransactionalEmailService, BrevoTransactionalEmailService>((serviceProvider, client) =>

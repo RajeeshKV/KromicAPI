@@ -12,6 +12,9 @@ public class TelegramWebhookRequest
 
     [JsonPropertyName("my_chat_member")]
     public TelegramMyChatMember? MyChatMember { get; set; }
+
+    [JsonPropertyName("callback_query")]
+    public TelegramCallbackQuery? CallbackQuery { get; set; }
 }
 
 public class TelegramMessage
@@ -96,6 +99,21 @@ public class TelegramChatMember
 
     [JsonPropertyName("status")]
     public string? Status { get; set; }
+}
+
+public class TelegramCallbackQuery
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("from")]
+    public TelegramUserDTO? From { get; set; }
+
+    [JsonPropertyName("message")]
+    public TelegramMessage? Message { get; set; }
+
+    [JsonPropertyName("data")]
+    public string? Data { get; set; }
 }
 public sealed record TelegramFeedbackNotification(
     string ChatId,

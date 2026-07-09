@@ -16,6 +16,16 @@ public interface ITransactionalEmailService
         string? callToActionText,
         string? callToActionUrl,
         CancellationToken cancellationToken);
+        
+        Task<string?> SendWeeklySummaryEmailAsync(
+        string toEmail,
+        string toName,
+        string subject,
+        string? heading,
+        string body,
+        string? callToActionText,
+        string? callToActionUrl,
+        CancellationToken cancellationToken);
     Task<string?> SendTelegramFeedbackAsync(
         TelegramFeedbackNotification feedback,
         CancellationToken cancellationToken);    Task<string?> SendAdminNotificationAsync(

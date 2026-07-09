@@ -91,6 +91,38 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
         return SendAsync(request, cancellationToken);
     }
 
+    public Task<string?> SendWeeklySummaryEmailAsync(
+        string toEmail,
+        string toName,
+        string subject,
+        string? heading,
+        string body,
+        string? callToActionText,
+        string? callToActionUrl,
+        CancellationToken cancellationToken)
+    {
+        EnsureConfigured(_options.WeeklySummaryEmailTemplateId);
+
+        var request = CreateTemplateRequest(
+            toEmail,
+            toName,
+            _options.WeeklySummaryEmailTemplateId,
+            new
+            {
+                name = toName,
+                email = toEmail,
+                subject,
+                heading,
+                body,
+                callToActionText,
+                callToActionUrl,
+                sentAt = DateTimeOffset.UtcNow
+            },
+            subject: subject);
+
+        return SendAsync(request, cancellationToken);
+    }
+
 
     public Task<string?> SendTelegramFeedbackAsync(
         TelegramFeedbackNotification feedback,

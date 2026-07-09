@@ -375,10 +375,29 @@ public sealed class GoldRateService(
         var istFetchedAt = TimeZoneInfo.ConvertTime(snapshot.FetchedAt, GetIndiaTimeZone());
         var eightGramRate = snapshot.R22KT * 8;
         var title = isLowestAlert ? "Lowest Gold Rate Found" : "Today's Gold Rate";
+        
+        // Calculate rate difference from yesterday
+        var yesterday = GetIndiaDayRange(snapshot.FetchedAt.AddDays(-1));
+        var yesterdayRate = await dbContext.GoldRateSnapshots
+            .AsNoTracking()
+            .Where(x => x.FetchedAt >= yesterday.StartUtc && x.FetchedAt < yesterday.EndUtc)
+            .OrderByDescending(x => x.FetchedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var rateDiffLine = string.Empty;
+        if (yesterdayRate != null)
+        {
+            var diff = snapshot.R22KT - yesterdayRate.R22KT;
+            var emoji = diff > 0 ? "🔺" : (diff < 0 ? "🔻" : "➡️");
+            var diffText = diff != 0 ? $" ({emoji} {Math.Abs(diff):N2})" : " (➡️ 0.00)";
+            rateDiffLine = $"<i>Change from yesterday: {diffText}</i>\n";
+        }
+
         var message = $"<b>{title}</b>\n\n" +
             "<b>22K Gold Rate</b>\n" +
             $"1g: Rs. {snapshot.R22KT:N2}\n" +
             $"8g: Rs. {eightGramRate:N2}\n" +
+            rateDiffLine +
             $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
 
         await telegramService.SendMessageAsync(message, cancellationToken);

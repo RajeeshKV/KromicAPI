@@ -1,4 +1,6 @@
 using System.Net.Http.Json;
+using System.Text.Json;
+using Kromic.Application.DTOs;
 using Kromic.Application.Interfaces;
 using Kromic.Application.Options;
 using Microsoft.Extensions.Logging;
@@ -13,6 +15,7 @@ public sealed class TelegramService(
     ILogger<TelegramService> logger) : ITelegramService
 {
     private readonly GoldRateOptions _options = options.Value;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<bool> SendMessageAsync(
         string message,
@@ -145,6 +148,103 @@ public sealed class TelegramService(
             {
                 chatIds.Add(trimmed);
             }
+        }
+    }
+
+    public async Task<bool> SendMessageWithMenuAsync(
+        string chatId,
+        string message,
+        List<TelegramMenuRow> menu,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_options.TelegramBotToken))
+        {
+            logger.LogWarning("Telegram bot token is not configured.");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(chatId))
+        {
+            logger.LogWarning("Chat ID is empty.");
+            return false;
+        }
+
+        try
+        {
+            var payload = new
+            {
+                chat_id = chatId,
+                text = message,
+                parse_mode = "HTML",
+                reply_markup = new
+                {
+                    inline_keyboard = menu.Select(row => 
+                        row.Buttons.Select(btn => 
+                            new 
+                            {
+                                text = btn.Text,
+                                callback_data = btn.CallbackData
+                            }).ToArray()).ToArray()
+                }
+            };
+
+            var url = $"https://api.telegram.org/bot{_options.TelegramBotToken}/sendMessage";
+            using var response = await httpClient.PostAsJsonAsync(url, payload, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                throw new InvalidOperationException(
+                    $"Telegram API returned {(int)response.StatusCode} {response.ReasonPhrase}. Error: {errorContent}");
+            }
+
+            logger.LogInformation("Telegram message with menu sent successfully to chat ID: {ChatId}", chatId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to send Telegram message with menu to chat ID: {ChatId}", chatId);
+            return false;
+        }
+    }
+
+    public async Task<bool> AnswerCallbackQueryAsync(
+        string callbackQueryId,
+        string? text = null,
+        bool showAlert = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_options.TelegramBotToken))
+        {
+            logger.LogWarning("Telegram bot token is not configured.");
+            return false;
+        }
+
+        try
+        {
+            var payload = new
+            {
+                callback_query_id = callbackQueryId,
+                text = text,
+                show_alert = showAlert
+            };
+
+            var url = $"https://api.telegram.org/bot{_options.TelegramBotToken}/answerCallbackQuery";
+            using var response = await httpClient.PostAsJsonAsync(url, payload, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                logger.LogWarning("Failed to answer callback query: {Error}", errorContent);
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to answer callback query: {CallbackQueryId}", callbackQueryId);
+            return false;
         }
     }
 }

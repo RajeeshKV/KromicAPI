@@ -18,6 +18,7 @@ public sealed class KromicDbContext(DbContextOptions<KromicDbContext> options) :
     public DbSet<TelegramUser> TelegramUsers => Set<TelegramUser>();
     public DbSet<UserSettings> UserSettings => Set<UserSettings>();
     public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
+    public DbSet<LocalizationResource> LocalizationResources => Set<LocalizationResource>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -113,6 +114,14 @@ public sealed class KromicDbContext(DbContextOptions<KromicDbContext> options) :
         {
             entity.HasIndex(x => x.Key).IsUnique();
             entity.Property(x => x.Key).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<LocalizationResource>(entity =>
+        {
+            entity.HasIndex(x => new { x.Language, x.Key }).IsUnique();
+            entity.Property(x => x.Language).HasMaxLength(5);
+            entity.Property(x => x.Key).HasMaxLength(200);
+            entity.Property(x => x.Value).HasColumnType("text");
         });
     }
 }

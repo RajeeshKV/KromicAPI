@@ -172,7 +172,10 @@ public sealed class TelegramConfigurationService(
     {
         var payload = new
         {
-            text = "📊 Menu"
+            menu_button = new
+            {
+                type = "commands"
+            }
         };
 
         var url = $"https://api.telegram.org/bot{_options.TelegramBotToken}/setChatMenuButton";

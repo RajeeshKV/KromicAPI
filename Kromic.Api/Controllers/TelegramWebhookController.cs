@@ -150,7 +150,11 @@ public sealed class TelegramWebhookController(
         var settings = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
         var language = settings.Language;
 
-        if (command == "/currentrate")
+        if (command == "/start")
+        {
+            await SendWelcomeAsync(chatId, cancellationToken, language);
+        }
+        else if (command == "/currentrate")
         {
             await SendCurrentRateAsync(chatId, cancellationToken, language);
         }
@@ -630,11 +634,41 @@ public sealed class TelegramWebhookController(
         var istFetchedAt = TimeZoneInfo.ConvertTime(rate.FetchedAt, indiaTimeZone);
         var eightGramRate = rate.R22KT * 8;
 
+        // Calculate rate difference from previous day
+        var yesterday = GetIndiaDayRange(selectedDateStart.AddDays(-1));
+        var yesterdayRateHistory = await goldRateService.GetHistoryAsync(
+            range: null,
+            from: yesterday.StartUtc,
+            to: yesterday.EndUtc,
+            cancellationToken);
+
+        var rate1gChange = string.Empty;
+        var rate8gChange = string.Empty;
+        
+        if (yesterdayRateHistory.Items != null && yesterdayRateHistory.Items.Count > 0)
+        {
+            var yesterdayRateValue = yesterdayRateHistory.Items.OrderByDescending(x => x.FetchedAt).First();
+            var diff = rate.R22KT - yesterdayRateValue.R22KT;
+            var diff8g = diff * 8;
+            var emoji = diff > 0 ? "🔺" : (diff < 0 ? "🔻" : "➡️");
+            
+            if (diff != 0)
+            {
+                rate1gChange = $" ({emoji} {Math.Abs(diff):N2})";
+                rate8gChange = $" ({emoji} {Math.Abs(diff8g):N2})";
+            }
+            else
+            {
+                rate1gChange = " (➡️ 0.00)";
+                rate8gChange = " (➡️ 0.00)";
+            }
+        }
+
         var message = $"<b>{localizationService.GetString("commands.current_rate", language)}</b>\n" +
                       $"<i>{istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>\n\n" +
                       "<b>22K Gold Rate</b>\n" +
-                      $"1g: Rs. {rate.R22KT:N2}\n" +
-                      $"8g: Rs. {eightGramRate:N2}";
+                      $"1g: Rs. {rate.R22KT:N2}{rate1gChange}\n" +
+                      $"8g: Rs. {eightGramRate:N2}{rate8gChange}";
 
         await telegramService.SendMessageToChatIdAsync(chatId, message, cancellationToken);
     }
@@ -761,11 +795,42 @@ public sealed class TelegramWebhookController(
             var istFetchedAt = TimeZoneInfo.ConvertTime(currentRate.FetchedAt, GetIndiaTimeZone());
             var eightGramRate = currentRate.R22KT * 8;
 
+            // Calculate rate difference from yesterday
+            var indiaTimeZone = GetIndiaTimeZone();
+            var yesterday = GetIndiaDayRange(currentRate.FetchedAt.AddDays(-1));
+            var yesterdayRate = await goldRateService.GetHistoryAsync(
+                range: null,
+                from: yesterday.StartUtc,
+                to: yesterday.EndUtc,
+                cancellationToken);
+
+            var rate1gChange = string.Empty;
+            var rate8gChange = string.Empty;
+            
+            if (yesterdayRate.Items != null && yesterdayRate.Items.Count > 0)
+            {
+                var yesterdayRateValue = yesterdayRate.Items.OrderByDescending(x => x.FetchedAt).First();
+                var diff = currentRate.R22KT - yesterdayRateValue.R22KT;
+                var diff8g = diff * 8;
+                var emoji = diff > 0 ? "🔺" : (diff < 0 ? "🔻" : "➡️");
+                
+                if (diff != 0)
+                {
+                    rate1gChange = $" ({emoji} {Math.Abs(diff):N2})";
+                    rate8gChange = $" ({emoji} {Math.Abs(diff8g):N2})";
+                }
+                else
+                {
+                    rate1gChange = " (➡️ 0.00)";
+                    rate8gChange = " (➡️ 0.00)";
+                }
+            }
+
             var title = isNewUser ? localizationService.GetString("commands.welcome_new", language) : localizationService.GetString("commands.current_rate", language);
             var message = $"<b>{title}</b>\n\n" +
                           "<b>22K Gold Rate</b>\n" +
-                          $"1g: Rs. {currentRate.R22KT:N2}\n" +
-                          $"8g: Rs. {eightGramRate:N2}\n" +
+                          $"1g: Rs. {currentRate.R22KT:N2}{rate1gChange}\n" +
+                          $"8g: Rs. {eightGramRate:N2}{rate8gChange}\n" +
                           $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
 
             if (isNewUser)
@@ -780,6 +845,13 @@ public sealed class TelegramWebhookController(
         {
             logger.LogError(ex, "Error sending rate to user {ChatId}", chatId);
         }
+    }
+
+    private async Task SendWelcomeAsync(string chatId, CancellationToken cancellationToken, string language = "en")
+    {
+        var welcomeMessage = localizationService.GetString("commands.welcome", language);
+        await telegramService.SendMessageToChatIdAsync(chatId, welcomeMessage, cancellationToken);
+        await SendHelpAsync(chatId, cancellationToken, language);
     }
 
     private async Task SendCurrentRateAsync(string chatId, CancellationToken cancellationToken, string language = "en")
@@ -908,6 +980,14 @@ public sealed class TelegramWebhookController(
         {
             return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
         }
+    }
+
+    private static (DateTimeOffset StartUtc, DateTimeOffset EndUtc) GetIndiaDayRange(DateTimeOffset value)
+    {
+        var indiaTimeZone = GetIndiaTimeZone();
+        var indiaValue = TimeZoneInfo.ConvertTime(value, indiaTimeZone);
+        var start = new DateTimeOffset(indiaValue.Year, indiaValue.Month, indiaValue.Day, 0, 0, 0, indiaValue.Offset).ToUniversalTime();
+        return (start, start.AddDays(1));
     }
 
     private async Task SendHelpAsync(string chatId, CancellationToken cancellationToken, string language = "en")

@@ -60,12 +60,13 @@ public sealed class LocalizationService : ILocalizationService
             {
                 var langCode = Path.GetFileNameWithoutExtension(file);
                 var jsonContent = File.ReadAllText(file);
-                var resources = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
+                var resources = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonContent);
 
                 if (resources != null)
                 {
-                    _resources[langCode] = resources;
-                    _logger.LogInformation("Loaded {Count} resources for language: {Lang}", resources.Count, langCode);
+                    var flattened = FlattenDictionary(resources);
+                    _resources[langCode] = flattened;
+                    _logger.LogInformation("Loaded {Count} resources for language: {Lang}", flattened.Count, langCode);
                 }
             }
         }
@@ -73,5 +74,30 @@ public sealed class LocalizationService : ILocalizationService
         {
             _logger.LogError(ex, "Error loading localization resources");
         }
+    }
+
+    private Dictionary<string, string> FlattenDictionary(Dictionary<string, object> dict, string prefix = "")
+    {
+        var result = new Dictionary<string, string>();
+
+        foreach (var kvp in dict)
+        {
+            var key = string.IsNullOrEmpty(prefix) ? kvp.Key : $"{prefix}.{kvp.Key}";
+
+            if (kvp.Value is Dictionary<string, object> nestedDict)
+            {
+                var nested = FlattenDictionary(nestedDict, key);
+                foreach (var nestedKvp in nested)
+                {
+                    result[nestedKvp.Key] = nestedKvp.Value;
+                }
+            }
+            else if (kvp.Value != null)
+            {
+                result[key] = kvp.Value.ToString() ?? string.Empty;
+            }
+        }
+
+        return result;
     }
 }

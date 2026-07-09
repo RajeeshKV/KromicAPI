@@ -384,20 +384,31 @@ public sealed class GoldRateService(
             .OrderByDescending(x => x.FetchedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var rateDiffLine = string.Empty;
+        var rate1gChange = string.Empty;
+        var rate8gChange = string.Empty;
+        
         if (yesterdayRate != null)
         {
             var diff = snapshot.R22KT - yesterdayRate.R22KT;
+            var diff8g = diff * 8;
             var emoji = diff > 0 ? "🔺" : (diff < 0 ? "🔻" : "➡️");
-            var diffText = diff != 0 ? $" ({emoji} {Math.Abs(diff):N2})" : " (➡️ 0.00)";
-            rateDiffLine = $"<i>Change from yesterday: {diffText}</i>\n";
+            
+            if (diff != 0)
+            {
+                rate1gChange = $" ({emoji} {Math.Abs(diff):N2})";
+                rate8gChange = $" ({emoji} {Math.Abs(diff8g):N2})";
+            }
+            else
+            {
+                rate1gChange = " (➡️ 0.00)";
+                rate8gChange = " (➡️ 0.00)";
+            }
         }
 
         var message = $"<b>{title}</b>\n\n" +
             "<b>22K Gold Rate</b>\n" +
-            $"1g: Rs. {snapshot.R22KT:N2}\n" +
-            $"8g: Rs. {eightGramRate:N2}\n" +
-            rateDiffLine +
+            $"1g: Rs. {snapshot.R22KT:N2}{rate1gChange}\n" +
+            $"8g: Rs. {eightGramRate:N2}{rate8gChange}\n" +
             $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
 
         await telegramService.SendMessageAsync(message, cancellationToken);

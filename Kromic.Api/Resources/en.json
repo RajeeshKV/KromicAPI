@@ -1,5 +1,6 @@
 {
   "commands": {
+    "welcome": "Welcome to Kromic Gold Rate Bot! 📈\n\nI'll send you daily gold rate updates. You can also check rates anytime using the commands below.",
     "start": "Welcome to Kromic Gold Rate Bot! 📈\n\nI'll send you daily gold rate updates. You can also check rates anytime using the commands below.",
     "help": "📚 Available Commands\n\n/currentrate - Get current gold rate\n/lastonemonthrates - View last 30 days rates\n/emailalerts - Subscribe to email alerts\n/feedback - Send feedback to admin\n/settings - Manage your notification settings\n/pause - Pause Telegram notifications\n/resume - Resume Telegram notifications\n/unsubscribeemail - Unsubscribe from email alerts\n/history - View historical rates by date\n/help - Show this help message",
     "settings": "⚙️ Settings\n\n📱 Telegram Notifications: {TelegramStatus}\n📧 Email Notifications: {EmailStatus}\n🌐 Language: {Language}\n\nUse the buttons below to change your settings.",

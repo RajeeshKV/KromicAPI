@@ -283,6 +283,17 @@ public sealed class GoldRateService(
             items.Select(ToResponse).ToList());
     }
 
+    private async Task<GoldRateSnapshot?> GetPreviousSnapshotAsync(
+        DateTimeOffset anchor,
+        CancellationToken cancellationToken)
+    {
+        return await dbContext.GoldRateSnapshots
+            .AsNoTracking()
+            .Where(x => x.FetchedAt < anchor)
+            .OrderByDescending(x => x.FetchedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     private async Task<string?> SendRateEmailAsync(
         GoldRateSnapshot snapshot,
         bool isLowestAlert,
@@ -297,13 +308,7 @@ public sealed class GoldRateService(
             : "Today's 22K gold rate";
         var eightGramRate = snapshot.R22KT * 8;
 
-        // Calculate rate difference from yesterday for structured email params
-        var yesterday = GetIndiaDayRange(snapshot.FetchedAt.AddDays(-1));
-        var yesterdayRate = await dbContext.GoldRateSnapshots
-            .AsNoTracking()
-            .Where(x => x.FetchedAt >= yesterday.StartUtc && x.FetchedAt < yesterday.EndUtc)
-            .OrderByDescending(x => x.FetchedAt)
-            .FirstOrDefaultAsync(cancellationToken);
+        var previousSnapshot = await GetPreviousSnapshotAsync(snapshot.FetchedAt, cancellationToken);
 
         var rate1gStr = $"Rs. {snapshot.R22KT:N2}";
         var rate8gStr = $"Rs. {eightGramRate:N2}";
@@ -311,9 +316,9 @@ public sealed class GoldRateService(
         var change8g = string.Empty;
         var changeClass = "rate-change-stable";
 
-        if (yesterdayRate != null)
+        if (previousSnapshot != null)
         {
-            var diff = snapshot.R22KT - yesterdayRate.R22KT;
+            var diff = snapshot.R22KT - previousSnapshot.R22KT;
             var diff8g = diff * 8;
             
             if (diff > 0)
@@ -403,21 +408,15 @@ public sealed class GoldRateService(
     {
         var istFetchedAt = TimeZoneInfo.ConvertTime(snapshot.FetchedAt, GetIndiaTimeZone());
         var eightGramRate = snapshot.R22KT * 8;
-        
-        // Calculate rate difference from yesterday
-        var yesterday = GetIndiaDayRange(snapshot.FetchedAt.AddDays(-1));
-        var yesterdayRate = await dbContext.GoldRateSnapshots
-            .AsNoTracking()
-            .Where(x => x.FetchedAt >= yesterday.StartUtc && x.FetchedAt < yesterday.EndUtc)
-            .OrderByDescending(x => x.FetchedAt)
-            .FirstOrDefaultAsync(cancellationToken);
+
+        var previousSnapshot = await GetPreviousSnapshotAsync(snapshot.FetchedAt, cancellationToken);
 
         var rate1gChange = string.Empty;
         var rate8gChange = string.Empty;
-        
-        if (yesterdayRate != null)
+
+        if (previousSnapshot != null)
         {
-            var diff = snapshot.R22KT - yesterdayRate.R22KT;
+            var diff = snapshot.R22KT - previousSnapshot.R22KT;
             var diff8g = diff * 8;
             var emoji = diff > 0 ? "🔺" : (diff < 0 ? "🔻" : "➡️");
             

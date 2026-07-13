@@ -1011,22 +1011,23 @@ public sealed class TelegramWebhookController(
             var istFetchedAt = TimeZoneInfo.ConvertTime(currentRate.FetchedAt, GetIndiaTimeZone());
             var eightGramRate = currentRate.R22KT * 8;
 
-            // Calculate rate difference from yesterday
-            var indiaTimeZone = GetIndiaTimeZone();
-            var yesterday = GetIndiaDayRange(currentRate.FetchedAt.AddDays(-1));
-            var yesterdayRate = await goldRateService.GetHistoryAsync(
+            var previousRateHistory = await goldRateService.GetHistoryAsync(
                 range: null,
-                from: yesterday.StartUtc,
-                to: yesterday.EndUtc,
+                from: null,
+                to: currentRate.FetchedAt,
                 cancellationToken);
 
             var rate1gChange = string.Empty;
             var rate8gChange = string.Empty;
-            
-            if (yesterdayRate.Items != null && yesterdayRate.Items.Count > 0)
+
+            var previousSnapshot = previousRateHistory.Items?
+                .Where(x => x.FetchedAt < currentRate.FetchedAt)
+                .OrderByDescending(x => x.FetchedAt)
+                .FirstOrDefault();
+
+            if (previousSnapshot != null)
             {
-                var yesterdayRateValue = yesterdayRate.Items.OrderByDescending(x => x.FetchedAt).First();
-                var diff = currentRate.R22KT - yesterdayRateValue.R22KT;
+                var diff = currentRate.R22KT - previousSnapshot.R22KT;
                 var diff8g = diff * 8;
                 var emoji = diff > 0 ? "🔺" : (diff < 0 ? "🔻" : "➡️");
                 

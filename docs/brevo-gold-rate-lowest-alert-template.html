@@ -9,8 +9,8 @@
       body {
         margin: 0;
         padding: 0;
-        background: #f6f1e5;
-        color: #211c12;
+        background: #1f1208;
+        color: #fff7ef;
         font-family: Arial, Helvetica, sans-serif;
       }
 
@@ -20,147 +20,233 @@
 
       .wrapper {
         width: 100%;
-        background: #f6f1e5;
-        padding: 28px 12px;
+        background: linear-gradient(180deg, #1f1208 0%, #110b06 100%);
+        padding: 32px 12px;
       }
 
       .container {
         width: 100%;
-        max-width: 640px;
+        max-width: 680px;
         margin: 0 auto;
-        background: #ffffff;
-        border: 1px solid #e5d6b9;
+        background: #2b190d;
+        border: 1px solid #4a2e18;
       }
 
       .header {
-        padding: 30px 32px 20px;
-        background: #3b2a12;
-        color: #ffffff;
+        padding: 32px 32px 18px;
+        background: #362111;
+        border-bottom: 1px solid #55331c;
       }
 
       .eyebrow {
-        margin: 0 0 8px;
-        color: #f4cf78;
+        margin: 0 0 10px;
+        color: #ffcc78;
         font-size: 12px;
         font-weight: 700;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
       }
 
       .title {
-        margin: 0;
+        margin: 0 0 12px;
+        color: #fffaf5;
         font-size: 28px;
-        line-height: 1.25;
+        line-height: 1.2;
         font-weight: 700;
+      }
+
+      .intro {
+        margin: 0;
+        color: #f2dac0;
+        font-size: 15px;
+        line-height: 1.6;
       }
 
       .content {
-        padding: 30px 32px 32px;
+        padding: 26px 32px 32px;
       }
 
-      .alert-card {
-        margin: 0 0 24px;
-        border: 2px solid #d6a941;
-        background: #fff9e9;
-      }
-
-      .alert-table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-
-      .alert-table th {
-        padding: 12px 20px;
-        text-align: left;
-        color: #7b5b13;
-        font-size: 13px;
+      .notice {
+        margin: 0 0 22px;
+        padding: 14px 16px;
+        background: #43290f;
+        border-left: 4px solid #f0b94b;
+        color: #fff0d0;
+        font-size: 14px;
+        line-height: 1.6;
         font-weight: 700;
+      }
+
+      .rate-table {
+        width: 100%;
+        background: #fff8ee;
+        border: 1px solid #e7cfad;
+      }
+
+      .rate-table th {
+        padding: 13px 16px;
+        text-align: left;
+        color: #80591a;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
-        border-bottom: 1px solid #e8c878;
+        border-bottom: 1px solid #e7cfad;
       }
 
-      .alert-table td {
-        padding: 16px 20px;
+      .rate-table td {
+        padding: 15px 16px;
         color: #2f210d;
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 600;
-        border-bottom: 1px solid #f0e0b0;
+        border-bottom: 1px solid #f0e2ca;
       }
 
-      .alert-table tr:last-child td {
+      .rate-table tr:last-child td {
         border-bottom: none;
       }
 
-      .alert-amount {
+      .metric {
+        font-size: 15px;
+        font-weight: 700;
+        color: #4a3112;
+      }
+
+      .rate-amount {
+        display: inline-block;
         font-size: 24px;
+        line-height: 1.2;
         font-weight: 700;
         color: #2f210d;
       }
 
-      .alert-change {
-        font-size: 16px;
-        font-weight: 600;
+      .rate-change {
+        display: inline-block;
         margin-left: 8px;
-      }
-
-      .alert-change-up {
-        color: #2e7d32;
-      }
-
-      .alert-change-down {
-        color: #c62828;
-      }
-
-      .alert-change-stable {
-        color: #7b5b13;
-      }
-
-      .alert-note {
-        padding: 8px 20px 16px;
-        color: #5c4314;
         font-size: 15px;
-        line-height: 1.5;
         font-weight: 700;
+        white-space: nowrap;
       }
 
-      .body-text {
-        margin: 0;
-        color: #30291d;
-        font-size: 15px;
-        line-height: 1.7;
-        white-space: pre-line;
+      .rate-change-up {
+        color: #2d8a57;
+      }
+
+      .rate-change-down {
+        color: #cf4f4f;
+      }
+
+      .rate-change-stable {
+        color: #8b6a34;
+      }
+
+      .meta-table {
+        width: 100%;
+        margin-top: 18px;
+        background: #3a220f;
+        border: 1px solid #55331c;
+      }
+
+      .meta-table th {
+        width: 36%;
+        padding: 14px 16px;
+        text-align: left;
+        color: #ffce8f;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        border-bottom: 1px solid #55331c;
+      }
+
+      .meta-table td {
+        padding: 14px 16px;
+        color: #fff2dd;
+        font-size: 14px;
+        line-height: 1.6;
+        border-bottom: 1px solid #55331c;
+      }
+
+      .cta-wrap {
+        padding-top: 20px;
+      }
+
+      .cta-button {
+        display: inline-block;
+        padding: 12px 18px;
+        background: #f0b94b;
+        color: #201208 !important;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 700;
+        border-radius: 6px;
+      }
+
+      .cta-hint {
+        margin: 10px 0 0;
+        color: #d3bfa0;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .meta-table tr:last-child th,
+      .meta-table tr:last-child td {
+        border-bottom: none;
       }
 
       .footer {
         padding: 18px 32px 28px;
-        color: #756b5b;
+        color: #d3bfa0;
         font-size: 12px;
         line-height: 1.6;
-        background: #fbf7ed;
-        border-top: 1px solid #eadfc9;
+        background: #201208;
+        border-top: 1px solid #55331c;
       }
 
-      @media screen and (max-width: 520px) {
+      @media screen and (max-width: 560px) {
+        .wrapper {
+          padding-left: 8px;
+          padding-right: 8px;
+        }
+
         .header,
         .content,
         .footer {
-          padding-left: 20px;
-          padding-right: 20px;
+          padding-left: 18px;
+          padding-right: 18px;
         }
 
         .title {
           font-size: 23px;
         }
 
-        .alert-value {
-          font-size: 28px;
+        .rate-table th,
+        .rate-table td,
+        .meta-table th,
+        .meta-table td {
+          padding-left: 12px;
+          padding-right: 12px;
+        }
+
+        .rate-amount {
+          font-size: 20px;
+        }
+
+        .rate-change {
+          margin-left: 0;
+          display: block;
+          margin-top: 4px;
+        }
+
+        .meta-table th {
+          width: 42%;
         }
       }
     </style>
   </head>
   <body>
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
-      Lowest saved R22KT gold rate found. Buy gold now.
+      {{ params.summary }} - {{ params.note }}
     </div>
 
     <table role="presentation" class="wrapper" width="100%">
@@ -169,44 +255,53 @@
           <table role="presentation" class="container" width="100%">
             <tr>
               <td class="header">
-                <p class="eyebrow">Lowest rate alert</p>
+                <p class="eyebrow">{{ params.summary }}</p>
                 <h1 class="title">{{ params.heading }}</h1>
+                <p class="intro">{{ params.note }}</p>
               </td>
             </tr>
             <tr>
               <td class="content">
-                <table role="presentation" class="alert-card" width="100%">
+                <table role="presentation" class="rate-table" width="100%">
                   <tr>
-                    <td>
-                      <table role="presentation" class="alert-table" width="100%">
-                        <tr>
-                          <th>Weight</th>
-                          <th>Rate</th>
-                        </tr>
-                        <tr>
-                          <td>1 Gram</td>
-                          <td><span class="alert-amount">{{ params.rate1g }}</span> <span class="alert-change {{ params.changeClass }}">{{ params.change }}</span></td>
-                        </tr>
-                        <tr>
-                          <td>8 Grams</td>
-                          <td><span class="alert-amount">{{ params.rate8g }}</span> <span class="alert-change {{ params.changeClass }}">{{ params.change8g }}</span></td>
-                        </tr>
-                      </table>
-                    </td>
+                    <th>Metric</th>
+                    <th>Rate</th>
+                    <th>Difference</th>
                   </tr>
                   <tr>
-                    <td class="alert-note">Buy gold now.</td>
+                    <td class="metric">1 Gram</td>
+                    <td><span class="rate-amount">{{ params.rate1g }}</span></td>
+                    <td><span class="rate-change {{ params.changeClass }}">{{ params.change1g }}</span></td>
+                  </tr>
+                  <tr>
+                    <td class="metric">8 Grams</td>
+                    <td><span class="rate-amount">{{ params.rate8g }}</span></td>
+                    <td><span class="rate-change {{ params.changeClass }}">{{ params.change8g }}</span></td>
                   </tr>
                 </table>
 
-                <p class="body-text">{{ params.body }}</p>
+                <table role="presentation" class="meta-table" width="100%">
+                  <tr>
+                    <th>Fetched at</th>
+                    <td>{{ params.fetchedAt }}</td>
+                  </tr>
+                  <tr>
+                    <th>For</th>
+                    <td>{{ params.name }} &lt;{{ params.email }}&gt;</td>
+                  </tr>
+                </table>
+
+                {% if params.callToActionText and params.callToActionUrl %}
+                <div class="cta-wrap" align="center">
+                  <a class="cta-button" href="{{ params.callToActionUrl }}">{{ params.callToActionText }}</a>
+                  <p class="cta-hint">This link unsubscribes this email from lowest-rate alerts.</p>
+                </div>
+                {% endif %}
               </td>
             </tr>
             <tr>
               <td class="footer">
-                This automated alert was sent to {{ params.email }} for {{ params.name }}.
-                <br>
-                Sent at: {{ params.sentAt }}
+                Lowest saved rate alert from Kromic.
               </td>
             </tr>
           </table>

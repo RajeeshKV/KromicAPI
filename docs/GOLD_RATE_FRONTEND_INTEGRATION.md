@@ -65,11 +65,17 @@ Both templates use the params currently sent by the backend:
 {{ params.email }}
 {{ params.subject }}
 {{ params.heading }}
-{{ params.body }}
-{{ params.sentAt }}
+{{ params.summary }}
+{{ params.note }}
+{{ params.rate1g }}
+{{ params.change1g }}
+{{ params.rate8g }}
+{{ params.change8g }}
+{{ params.changeClass }}
+{{ params.fetchedAt }}
 ```
 
-Current backend behavior uses `Brevo__CustomEmailTemplateId` for both gold-rate email types and changes the `subject`, `heading`, and `body` per email. If you want Brevo to use two visually separate template IDs, add separate backend config keys such as `GoldRate__DailyTemplateId` and `GoldRate__LowestAlertTemplateId`, then route each email type to the matching Brevo template.
+Current backend behavior uses `Brevo__CustomEmailTemplateId` for both gold-rate email types and sends a dedicated tabular param contract that includes the 1g and 8g rates, arrow-style differences, and the fetched date/time. If you want Brevo to use two visually separate template IDs, add separate backend config keys such as `GoldRate__DailyTemplateId` and `GoldRate__LowestAlertTemplateId`, then route each email type to the matching Brevo template.
 
 ## Endpoints
 

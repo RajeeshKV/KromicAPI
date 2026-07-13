@@ -22,3 +22,19 @@ public sealed record GoldRateHistoryResponse(
     GoldRateSnapshotResponse? Current,
     GoldRateSnapshotResponse? Lowest,
     IReadOnlyList<GoldRateSnapshotResponse> Items);
+
+public sealed record GoldRateEmailTemplateParams(
+    string Name,
+    string Email,
+    string Subject,
+    string Heading,
+    string Summary,
+    string Note,
+    string Rate1g,
+    string Change1g,
+    string Rate8g,
+    string Change8g,
+    string ChangeClass,
+    string FetchedAt,
+    string? CallToActionText = null,
+    string? CallToActionUrl = null);

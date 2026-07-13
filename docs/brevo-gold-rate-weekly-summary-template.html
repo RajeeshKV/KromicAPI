@@ -9,8 +9,8 @@
       body {
         margin: 0;
         padding: 0;
-        background: #f4f7f6;
-        color: #17201d;
+        background: #07111c;
+        color: #e9f6f3;
         font-family: Arial, Helvetica, sans-serif;
       }
 
@@ -20,101 +20,101 @@
 
       .wrapper {
         width: 100%;
-        background: #f4f7f6;
-        padding: 28px 12px;
+        background: linear-gradient(180deg, #07111c 0%, #0c1726 100%);
+        padding: 32px 12px;
       }
 
       .container {
         width: 100%;
-        max-width: 640px;
+        max-width: 680px;
         margin: 0 auto;
-        background: #ffffff;
-        border: 1px solid #dce5e1;
+        background: #0f1e2d;
+        border: 1px solid #20364b;
       }
 
       .header {
-        padding: 28px 32px 18px;
-        background: #173f35;
-        color: #ffffff;
+        padding: 32px 32px 18px;
+        background: #102336;
+        border-bottom: 1px solid #1b3145;
       }
 
       .eyebrow {
-        margin: 0 0 8px;
-        color: #bfe2d6;
+        margin: 0 0 10px;
+        color: #63e6d6;
         font-size: 12px;
         font-weight: 700;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
       }
 
       .title {
-        margin: 0;
-        font-size: 26px;
-        line-height: 1.25;
+        margin: 0 0 12px;
+        color: #f5fbfa;
+        font-size: 28px;
+        line-height: 1.2;
         font-weight: 700;
+      }
+
+      .intro {
+        margin: 0;
+        color: #b9cbd4;
+        font-size: 15px;
+        line-height: 1.6;
       }
 
       .content {
-        padding: 30px 32px 32px;
+        padding: 26px 32px 32px;
       }
 
-      .period-info {
-        margin: 0 0 24px;
-        padding: 16px 20px;
-        background: #f0f4f2;
-        border-left: 3px solid #173f35;
-        color: #26332f;
-        font-size: 14px;
-      }
-
-      .stats-grid {
-        margin: 0 0 24px;
-      }
-
-      .stat-card {
-        border: 1px solid #d9e4de;
-        background: #fbfdfc;
-        padding: 0;
-        margin-bottom: 12px;
-      }
-
-      .stat-table {
+      .summary-table {
         width: 100%;
-        border-collapse: collapse;
+        background: #f7fbfa;
+        border: 1px solid #d7e6e2;
       }
 
-      .stat-table th {
-        padding: 12px 20px;
+      .summary-table th {
+        padding: 13px 16px;
         text-align: left;
-        color: #5d6f68;
-        font-size: 13px;
+        color: #476057;
+        font-size: 12px;
         font-weight: 700;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
-        border-bottom: 1px solid #d9e4de;
+        border-bottom: 1px solid #d7e6e2;
       }
 
-      .stat-table td {
-        padding: 16px 20px;
-        color: #0f2f28;
-        font-size: 16px;
+      .summary-table td {
+        padding: 15px 16px;
+        color: #10211d;
+        font-size: 15px;
         font-weight: 600;
-        border-bottom: 1px solid #e8f0ec;
+        border-bottom: 1px solid #e7efec;
       }
 
-      .stat-table tr:last-child td {
+      .summary-table tr:last-child td {
         border-bottom: none;
       }
 
-      .stat-value {
-        font-size: 24px;
+      .metric {
+        font-size: 15px;
         font-weight: 700;
-        color: #0f2f28;
+        color: #18312c;
       }
 
-      .stat-sub {
-        font-size: 13px;
-        color: #5d6f68;
+      .value {
+        display: inline-block;
+        font-size: 24px;
+        line-height: 1.2;
+        font-weight: 700;
+        color: #10211d;
+      }
+
+      .value-sub {
+        display: block;
         margin-top: 4px;
+        color: #5d6f68;
+        font-size: 13px;
+        font-weight: 600;
       }
 
       .trend-up {
@@ -129,37 +129,100 @@
         color: #5d6f68;
       }
 
-      .body-text {
-        margin: 0;
-        color: #26332f;
-        font-size: 15px;
-        line-height: 1.7;
-        white-space: pre-line;
+      .meta-table {
+        width: 100%;
+        margin-top: 18px;
+        background: #132838;
+        border: 1px solid #20384d;
+      }
+
+      .meta-table th {
+        width: 36%;
+        padding: 14px 16px;
+        text-align: left;
+        color: #8db7c1;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        border-bottom: 1px solid #20384d;
+      }
+
+      .meta-table td {
+        padding: 14px 16px;
+        color: #eef7f5;
+        font-size: 14px;
+        line-height: 1.6;
+        border-bottom: 1px solid #20384d;
+      }
+
+      .cta-wrap {
+        padding-top: 20px;
+      }
+
+      .cta-button {
+        display: inline-block;
+        padding: 12px 18px;
+        background: #27d7c4;
+        color: #06201d !important;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 700;
+        border-radius: 6px;
+      }
+
+      .cta-hint {
+        margin: 10px 0 0;
+        color: #8ea1ad;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .meta-table tr:last-child th,
+      .meta-table tr:last-child td {
+        border-bottom: none;
       }
 
       .footer {
         padding: 18px 32px 28px;
-        color: #6a7772;
+        color: #8ea1ad;
         font-size: 12px;
         line-height: 1.6;
-        background: #f8faf9;
-        border-top: 1px solid #e5ece8;
+        background: #0b1724;
+        border-top: 1px solid #1b3145;
       }
 
-      @media screen and (max-width: 520px) {
+      @media screen and (max-width: 560px) {
+        .wrapper {
+          padding-left: 8px;
+          padding-right: 8px;
+        }
+
         .header,
         .content,
         .footer {
-          padding-left: 20px;
-          padding-right: 20px;
+          padding-left: 18px;
+          padding-right: 18px;
         }
 
         .title {
-          font-size: 22px;
+          font-size: 23px;
         }
 
-        .stat-value {
+        .summary-table th,
+        .summary-table td,
+        .meta-table th,
+        .meta-table td {
+          padding-left: 12px;
+          padding-right: 12px;
+        }
+
+        .value {
           font-size: 20px;
+        }
+
+        .meta-table th {
+          width: 42%;
         }
       }
     </style>
@@ -177,137 +240,64 @@
               <td class="header">
                 <p class="eyebrow">Weekly summary</p>
                 <h1 class="title">{{ params.heading }}</h1>
+                <p class="intro">{{ params.trend }} for the last 7 days.</p>
               </td>
             </tr>
             <tr>
               <td class="content">
-                <div class="period-info">
-                  <strong>Period:</strong> {{ params.startDate }} - {{ params.endDate }}
-                </div>
-
-                <table role="presentation" class="stats-grid" width="100%">
+                <table role="presentation" class="summary-table" width="100%">
                   <tr>
-                    <td>
-                      <table role="presentation" class="stat-card" width="100%">
-                        <tr>
-                          <td>
-                            <table role="presentation" class="stat-table" width="100%">
-                              <tr>
-                                <th>Metric</th>
-                                <th>Value</th>
-                              </tr>
-                              <tr>
-                                <td>Average Rate</td>
-                                <td><span class="stat-value">{{ params.averageRate }}</span></td>
-                              </tr>
-                            </table>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
+                    <th>Metric</th>
+                    <th>Value</th>
                   </tr>
                   <tr>
-                    <td>
-                      <table role="presentation" class="stat-card" width="100%">
-                        <tr>
-                          <td>
-                            <table role="presentation" class="stat-table" width="100%">
-                              <tr>
-                                <th>Metric</th>
-                                <th>Value</th>
-                              </tr>
-                              <tr>
-                                <td>Highest Rate</td>
-                                <td><span class="stat-value">{{ params.highestRate }}</span></td>
-                              </tr>
-                              <tr>
-                                <td></td>
-                                <td class="stat-sub">{{ params.highestDate }}</td>
-                              </tr>
-                            </table>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
+                    <td class="metric">Period</td>
+                    <td><span class="value">{{ params.startDate }} - {{ params.endDate }}</span></td>
                   </tr>
                   <tr>
-                    <td>
-                      <table role="presentation" class="stat-card" width="100%">
-                        <tr>
-                          <td>
-                            <table role="presentation" class="stat-table" width="100%">
-                              <tr>
-                                <th>Metric</th>
-                                <th>Value</th>
-                              </tr>
-                              <tr>
-                                <td>Lowest Rate</td>
-                                <td><span class="stat-value">{{ params.lowestRate }}</span></td>
-                              </tr>
-                              <tr>
-                                <td></td>
-                                <td class="stat-sub">{{ params.lowestDate }}</td>
-                              </tr>
-                            </table>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
+                    <td class="metric">Average Rate</td>
+                    <td><span class="value">{{ params.averageRate }}</span></td>
                   </tr>
                   <tr>
-                    <td>
-                      <table role="presentation" class="stat-card" width="100%">
-                        <tr>
-                          <td>
-                            <table role="presentation" class="stat-table" width="100%">
-                              <tr>
-                                <th>Metric</th>
-                                <th>Value</th>
-                              </tr>
-                              <tr>
-                                <td>Weekly Trend</td>
-                                <td><span class="stat-value {{ params.trendClass }}">{{ params.trend }}</span></td>
-                              </tr>
-                              <tr>
-                                <td></td>
-                                <td class="stat-sub">{{ params.trendAmount }}</td>
-                              </tr>
-                            </table>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
+                    <td class="metric">Highest Rate</td>
+                    <td><span class="value">{{ params.highestRate }}</span><span class="value-sub">{{ params.highestDate }}</span></td>
                   </tr>
                   <tr>
-                    <td>
-                      <table role="presentation" class="stat-card" width="100%">
-                        <tr>
-                          <td>
-                            <table role="presentation" class="stat-table" width="100%">
-                              <tr>
-                                <th>Metric</th>
-                                <th>Value</th>
-                              </tr>
-                              <tr>
-                                <td>Current Rate</td>
-                                <td><span class="stat-value">{{ params.currentRate }}</span></td>
-                              </tr>
-                            </table>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
+                    <td class="metric">Lowest Rate</td>
+                    <td><span class="value">{{ params.lowestRate }}</span><span class="value-sub">{{ params.lowestDate }}</span></td>
+                  </tr>
+                  <tr>
+                    <td class="metric">Weekly Trend</td>
+                    <td><span class="value {{ params.trendClass }}">{{ params.trend }}</span><span class="value-sub">{{ params.trendAmount }}</span></td>
+                  </tr>
+                  <tr>
+                    <td class="metric">Current Rate</td>
+                    <td><span class="value">{{ params.currentRate }}</span></td>
                   </tr>
                 </table>
 
-                <p class="body-text">{{ params.body }}</p>
+                <table role="presentation" class="meta-table" width="100%">
+                  <tr>
+                    <th>Sent to</th>
+                    <td>{{ params.name }} &lt;{{ params.email }}&gt;</td>
+                  </tr>
+                  <tr>
+                    <th>Sent at</th>
+                    <td>{{ params.sentAt }}</td>
+                  </tr>
+                </table>
+
+                {% if params.callToActionText and params.callToActionUrl %}
+                <div class="cta-wrap" align="center">
+                  <a class="cta-button" href="{{ params.callToActionUrl }}">{{ params.callToActionText }}</a>
+                  <p class="cta-hint">This link unsubscribes this email from weekly gold-rate summaries.</p>
+                </div>
+                {% endif %}
               </td>
             </tr>
             <tr>
               <td class="footer">
-                This automated message was sent to {{ params.email }} for {{ params.name }}.
-                <br>
-                Sent at: {{ params.sentAt }}
+                This automated message was sent by Kromic.
               </td>
             </tr>
           </table>

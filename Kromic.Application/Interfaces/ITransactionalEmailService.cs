@@ -30,14 +30,7 @@ public interface ITransactionalEmailService
     Task<string?> SendGoldRateEmailAsync(
         string toEmail,
         string toName,
-        string subject,
-        string heading,
-        string rate1g,
-        string rate8g,
-        string change,
-        string change8g,
-        string changeClass,
-        string fetchedAt,
+        GoldRateEmailTemplateParams templateParams,
         CancellationToken cancellationToken);
 
     Task<string?> SendWeeklySummaryEmailStructuredAsync(
@@ -56,7 +49,9 @@ public interface ITransactionalEmailService
         string trendAmount,
         string trendClass,
         string currentRate,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? callToActionText = null,
+        string? callToActionUrl = null);
 
     Task<string?> SendTelegramFeedbackAsync(
         TelegramFeedbackNotification feedback,

@@ -306,6 +306,10 @@ public sealed class GoldRateService(
         var heading = isLowestAlert
             ? "This is the lowest saved 22K rate. Buy gold now."
             : "Today's 22K gold rate";
+        var summary = isLowestAlert ? "Lowest saved rate" : "Daily gold rate update";
+        var note = isLowestAlert
+            ? "This is the lowest saved 22K rate. Buy gold now."
+            : "Today's 22K gold rate snapshot.";
         var eightGramRate = snapshot.R22KT * 8;
 
         var previousSnapshot = await GetPreviousSnapshotAsync(snapshot.FetchedAt, cancellationToken);
@@ -340,24 +344,31 @@ public sealed class GoldRateService(
             }
         }
 
-        var fetchedAtStr = $"{istFetchedAt:dd MMM yyyy, hh:mm tt} IST";
+        var fetchedAtStr = $"{istFetchedAt:dd MMM yyyy, hh:mm tt}";
 
         var messageIds = new List<string>();
         var recipients = ResolveRecipients();
         foreach (var recipient in recipients)
         {
             var recipientName = string.IsNullOrWhiteSpace(_options.RecipientName) ? recipient : _options.RecipientName;
+            var templateParams = new GoldRateEmailTemplateParams(
+                recipientName,
+                recipient,
+                subject,
+                heading,
+                summary,
+                note,
+                rate1gStr,
+                change,
+                rate8gStr,
+                change8g,
+                changeClass,
+                fetchedAtStr);
+
             var messageId = await emailService.SendGoldRateEmailAsync(
                 recipient,
                 recipientName,
-                subject,
-                heading,
-                rate1gStr,
-                rate8gStr,
-                change,
-                change8g,
-                changeClass,
-                fetchedAtStr,
+                templateParams,
                 cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(messageId))
@@ -369,17 +380,27 @@ public sealed class GoldRateService(
         var subscribers = await emailSubscriptionService.GetActiveSubscribersAsync(cancellationToken);
         foreach (var subscriber in subscribers)
         {
-            var messageId = await emailService.SendGoldRateEmailAsync(
+            var unsubscribeUrl = BuildUnsubscribeUrl(subscriber.UnsubscribeToken);
+            var templateParams = new GoldRateEmailTemplateParams(
                 subscriber.Email,
                 subscriber.Email,
                 subject,
                 heading,
+                summary,
+                note,
                 rate1gStr,
-                rate8gStr,
                 change,
+                rate8gStr,
                 change8g,
                 changeClass,
                 fetchedAtStr,
+                unsubscribeUrl is null ? null : "Unsubscribe",
+                unsubscribeUrl);
+
+            var messageId = await emailService.SendGoldRateEmailAsync(
+                subscriber.Email,
+                subscriber.Email,
+                templateParams,
                 cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(messageId))

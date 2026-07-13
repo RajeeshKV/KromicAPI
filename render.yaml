@@ -49,5 +49,9 @@ services:
         sync: false
       - key: Brevo__ContactResponseTemplateId
         sync: false
+      - key: Brevo__CustomEmailTemplateId
+        sync: false
+      - key: Brevo__WeeklySummaryEmailTemplateId
+        sync: false
       - key: Cors__AllowedOrigins
         sync: false

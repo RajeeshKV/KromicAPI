@@ -101,12 +101,13 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
         string? callToActionUrl,
         CancellationToken cancellationToken)
     {
-        EnsureConfigured(_options.WeeklySummaryEmailTemplateId);
+        var templateId = ResolveWeeklySummaryTemplateId();
+        EnsureConfigured(templateId);
 
         var request = CreateTemplateRequest(
             toEmail,
             toName,
-            _options.WeeklySummaryEmailTemplateId,
+            templateId,
             new
             {
                 name = toName,
@@ -126,14 +127,7 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
     public Task<string?> SendGoldRateEmailAsync(
         string toEmail,
         string toName,
-        string subject,
-        string heading,
-        string rate1g,
-        string rate8g,
-        string change,
-        string change8g,
-        string changeClass,
-        string fetchedAt,
+        GoldRateEmailTemplateParams templateParams,
         CancellationToken cancellationToken)
     {
         EnsureConfigured(_options.CustomEmailTemplateId);
@@ -142,21 +136,8 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
             toEmail,
             toName,
             _options.CustomEmailTemplateId,
-            new
-            {
-                name = toName,
-                email = toEmail,
-                subject,
-                heading,
-                rate1g,
-                rate8g,
-                change,
-                change8g,
-                changeClass,
-                fetchedAt,
-                sentAt = DateTimeOffset.UtcNow
-            },
-            subject: subject);
+            templateParams,
+            subject: templateParams.Subject);
 
         return SendAsync(request, cancellationToken);
     }
@@ -177,14 +158,17 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
         string trendAmount,
         string trendClass,
         string currentRate,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? callToActionText = null,
+        string? callToActionUrl = null)
     {
-        EnsureConfigured(_options.WeeklySummaryEmailTemplateId);
+        var templateId = ResolveWeeklySummaryTemplateId();
+        EnsureConfigured(templateId);
 
         var request = CreateTemplateRequest(
             toEmail,
             toName,
-            _options.WeeklySummaryEmailTemplateId,
+            templateId,
             new
             {
                 name = toName,
@@ -202,6 +186,8 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
                 trendAmount,
                 trendClass,
                 currentRate,
+                callToActionText,
+                callToActionUrl,
                 sentAt = DateTimeOffset.UtcNow
             },
             subject: subject);
@@ -328,6 +314,11 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
             throw new InvalidOperationException("Brevo email configuration is incomplete.");
         }
     }
+
+    private int ResolveWeeklySummaryTemplateId() =>
+        _options.WeeklySummaryEmailTemplateId > 0
+            ? _options.WeeklySummaryEmailTemplateId
+            : _options.CustomEmailTemplateId;
 
     private sealed class BrevoSendEmailRequest
     {

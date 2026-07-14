@@ -130,12 +130,13 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
         GoldRateEmailTemplateParams templateParams,
         CancellationToken cancellationToken)
     {
-        EnsureConfigured(_options.CustomEmailTemplateId);
+        var templateId = ResolveGoldRateTemplateId(templateParams.IsLowestAlert);
+        EnsureConfigured(templateId);
 
         var request = CreateTemplateRequest(
             toEmail,
             toName,
-            _options.CustomEmailTemplateId,
+            templateId,
             templateParams,
             subject: templateParams.Subject);
 
@@ -319,6 +320,11 @@ public sealed class BrevoTransactionalEmailService(HttpClient httpClient, IOptio
         _options.WeeklySummaryEmailTemplateId > 0
             ? _options.WeeklySummaryEmailTemplateId
             : _options.CustomEmailTemplateId;
+
+    private int ResolveGoldRateTemplateId(bool isLowestAlert) =>
+        isLowestAlert
+            ? (_options.GoldRateLowestAlertTemplateId > 0 ? _options.GoldRateLowestAlertTemplateId : _options.CustomEmailTemplateId)
+            : (_options.GoldRateDailyTemplateId > 0 ? _options.GoldRateDailyTemplateId : _options.CustomEmailTemplateId);
 
     private sealed class BrevoSendEmailRequest
     {

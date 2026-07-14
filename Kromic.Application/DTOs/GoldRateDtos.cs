@@ -36,5 +36,6 @@ public sealed record GoldRateEmailTemplateParams(
     string Change8g,
     string ChangeClass,
     string FetchedAt,
+    bool IsLowestAlert,
     string? CallToActionText = null,
     string? CallToActionUrl = null);

@@ -363,7 +363,8 @@ public sealed class GoldRateService(
                 rate8gStr,
                 change8g,
                 changeClass,
-                fetchedAtStr);
+                fetchedAtStr,
+                false);
 
             var messageId = await emailService.SendGoldRateEmailAsync(
                 recipient,
@@ -394,6 +395,7 @@ public sealed class GoldRateService(
                 change8g,
                 changeClass,
                 fetchedAtStr,
+                true,
                 unsubscribeUrl is null ? null : "Unsubscribe",
                 unsubscribeUrl);
 

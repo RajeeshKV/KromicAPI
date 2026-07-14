@@ -12,6 +12,8 @@
         background: #1f1208;
         color: #fff7ef;
         font-family: Arial, Helvetica, sans-serif;
+        -webkit-text-size-adjust: 100%;
+        -ms-text-size-adjust: 100%;
       }
 
       table {
@@ -30,6 +32,7 @@
         margin: 0 auto;
         background: #2b190d;
         border: 1px solid #4a2e18;
+        overflow: hidden;
       }
 
       .header {
@@ -209,27 +212,84 @@
           padding-right: 8px;
         }
 
+        .container {
+          max-width: 100% !important;
+          border-left: 0;
+          border-right: 0;
+        }
+
         .header,
         .content,
         .footer {
-          padding-left: 18px;
-          padding-right: 18px;
+          padding-left: 14px;
+          padding-right: 14px;
         }
 
         .title {
-          font-size: 23px;
+          font-size: 22px;
+        }
+
+        .intro {
+          font-size: 14px;
+        }
+
+        .rate-table,
+        .meta-table {
+          background: transparent;
+          border: 0;
+        }
+
+        .rate-table tr,
+        .meta-table tr {
+          display: block;
+          margin-bottom: 12px;
+          border: 1px solid #e7cfad;
+          border-radius: 14px;
+          overflow: hidden;
+          background: #fff8ee;
+        }
+
+        .rate-table tr:first-child,
+        .meta-table tr:first-child {
+          display: none;
         }
 
         .rate-table th,
         .rate-table td,
         .meta-table th,
         .meta-table td {
-          padding-left: 12px;
-          padding-right: 12px;
+          display: block;
+          width: 100%;
+          box-sizing: border-box;
+          padding-left: 14px;
+          padding-right: 14px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .rate-table th,
+        .rate-table td {
+          color: #2f210d;
+          border-bottom-color: #f0e2ca;
+        }
+
+        .meta-table tr {
+          border-color: #55331c;
+          background: #362111;
+        }
+
+        .meta-table th,
+        .meta-table td {
+          color: #fff2dd;
+          border-bottom-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .meta-table th {
+          color: #ffd69c;
         }
 
         .rate-amount {
           font-size: 20px;
+          color: #2f210d;
         }
 
         .rate-change {
@@ -238,8 +298,17 @@
           margin-top: 4px;
         }
 
-        .meta-table th {
-          width: 42%;
+        .meta-table td:last-child,
+        .rate-table td:last-child,
+        .meta-table tr:last-child td,
+        .rate-table tr:last-child td {
+          border-bottom: 0;
+        }
+
+        .cta-button {
+          display: block;
+          width: 100%;
+          text-align: center;
         }
       }
     </style>

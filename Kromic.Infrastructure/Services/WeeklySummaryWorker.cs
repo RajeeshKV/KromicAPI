@@ -4,25 +4,21 @@ using Kromic.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System.Globalization;
 
 namespace Kromic.Infrastructure.Services;
 
 public sealed class WeeklySummaryWorker(
-    KromicDbContext dbContext,
-    IGoldRateService goldRateService,
-    ITelegramService telegramService,
     ITransactionalEmailService emailService,
-    ITelegramUserService telegramUserService,
-    IGoldRateEmailSubscriptionService emailSubscriptionService,
     IOptions<BrevoOptions> brevoOptions,
     IOptions<GoldRateOptions> options,
+    IServiceScopeFactory scopeFactory,
     ILogger<WeeklySummaryWorker> logger) : BackgroundService
 {
     private readonly GoldRateOptions _options = options.Value;
     private readonly BrevoOptions _brevoOptions = brevoOptions.Value;
-    private const string LastWeeklySummarySentKey = "WeeklySummaryLastSentIstDate";
     private static readonly TimeSpan WeeklySummaryStartTime = TimeSpan.FromHours(10);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -69,6 +65,12 @@ public sealed class WeeklySummaryWorker(
     {
         try
         {
+            using var scope = scopeFactory.CreateScope();
+            var goldRateService = scope.ServiceProvider.GetRequiredService<IGoldRateService>();
+            var telegramService = scope.ServiceProvider.GetRequiredService<ITelegramService>();
+            var telegramUserService = scope.ServiceProvider.GetRequiredService<ITelegramUserService>();
+            var emailSubscriptionService = scope.ServiceProvider.GetRequiredService<IGoldRateEmailSubscriptionService>();
+
             var indiaTimeZone = GetIndiaTimeZone();
             var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, indiaTimeZone);
             var sevenDaysAgo = now.AddDays(-7);
@@ -123,7 +125,7 @@ public sealed class WeeklySummaryWorker(
             }
 
             // Send to email subscribers
-            var recipients = await ResolveWeeklyEmailRecipientsAsync(cancellationToken);
+            var recipients = await ResolveWeeklyEmailRecipientsAsync(emailSubscriptionService, cancellationToken);
             if (recipients.Count == 0)
             {
                 logger.LogWarning("Weekly summary skipped because no email recipients are configured.");
@@ -173,7 +175,9 @@ public sealed class WeeklySummaryWorker(
         }
     }
 
-    private async Task<List<WeeklyRecipient>> ResolveWeeklyEmailRecipientsAsync(CancellationToken cancellationToken)
+    private async Task<List<WeeklyRecipient>> ResolveWeeklyEmailRecipientsAsync(
+        IGoldRateEmailSubscriptionService emailSubscriptionService,
+        CancellationToken cancellationToken)
     {
         var recipients = new Dictionary<string, WeeklyRecipient>(StringComparer.OrdinalIgnoreCase);
 
@@ -217,6 +221,8 @@ public sealed class WeeklySummaryWorker(
 
     private async Task<bool> IsWeeklySummaryAlreadySentAsync(string sentKey, CancellationToken cancellationToken)
     {
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<KromicDbContext>();
         var setting = await dbContext.ApplicationSettings
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Key == LastWeeklySummarySentKey, cancellationToken);
@@ -226,6 +232,8 @@ public sealed class WeeklySummaryWorker(
 
     private async Task MarkWeeklySummarySentAsync(string sentKey, CancellationToken cancellationToken)
     {
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<KromicDbContext>();
         var setting = await dbContext.ApplicationSettings
             .FirstOrDefaultAsync(x => x.Key == LastWeeklySummarySentKey, cancellationToken);
 
@@ -258,6 +266,8 @@ public sealed class WeeklySummaryWorker(
 
         return $"{_options.PublicBaseUrl.TrimEnd('/')}/api/gold-rate-email-alerts/unsubscribe?token={Uri.EscapeDataString(token)}";
     }
+
+    private const string LastWeeklySummarySentKey = "WeeklySummaryLastSentIstDate";
 
     private sealed record WeeklyRecipient(string Email, string Name, string? UnsubscribeUrl);
 

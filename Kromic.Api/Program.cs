@@ -70,11 +70,8 @@ using (var scope = app.Services.CreateScope())
     await dbContext.Database.MigrateAsync();
 
     // Apply Telegram bot configuration
-    var telegramConfigService = scope.ServiceProvider.GetService<ITelegramConfigurationService>();
-    if (telegramConfigService != null)
-    {
-        await telegramConfigService.ApplyConfigurationAsync(CancellationToken.None);
-    }
+    var telegramConfigService = scope.ServiceProvider.GetRequiredService<ITelegramConfigurationService>();
+    await telegramConfigService.ApplyConfigurationAsync(CancellationToken.None);
 }
 
 if (args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase))

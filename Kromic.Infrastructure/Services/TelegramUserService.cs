@@ -23,7 +23,8 @@ public sealed class TelegramUserService(
         string? firstName,
         string? lastName,
         string? username,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool updateLastInteractedAt = true)
     {
         var existingUser = await dbContext.TelegramUsers
             .FirstOrDefaultAsync(x => x.ChatId == chatId, cancellationToken);
@@ -34,7 +35,10 @@ public sealed class TelegramUserService(
             existingUser.LastName = lastName ?? existingUser.LastName;
             existingUser.Username = username ?? existingUser.Username;
             existingUser.IsActive = true;
-            existingUser.LastInteractedAt = DateTimeOffset.UtcNow;
+            if (updateLastInteractedAt)
+            {
+                existingUser.LastInteractedAt = DateTimeOffset.UtcNow;
+            }
 
             dbContext.TelegramUsers.Update(existingUser);
             logger.LogInformation("Updated existing Telegram user with chat ID: {ChatId}", chatId);
@@ -48,7 +52,7 @@ public sealed class TelegramUserService(
                 LastName = lastName,
                 Username = username,
                 IsActive = true,
-                LastInteractedAt = DateTimeOffset.UtcNow
+                LastInteractedAt = updateLastInteractedAt ? DateTimeOffset.UtcNow : null
             };
 
             dbContext.TelegramUsers.Add(newUser);

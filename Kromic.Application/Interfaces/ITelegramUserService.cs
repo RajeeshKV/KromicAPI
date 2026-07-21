@@ -11,7 +11,8 @@ public interface ITelegramUserService
         string? firstName,
         string? lastName,
         string? username,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        bool updateLastInteractedAt = true);
     Task<List<string>> GetActiveChatIdsAsync(CancellationToken cancellationToken);
     Task<int> GetActiveChatCountAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<TelegramBotUserResponse>> GetUsersWithEmailSubscriptionsAsync(CancellationToken cancellationToken);

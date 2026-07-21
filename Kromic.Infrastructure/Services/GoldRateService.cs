@@ -553,7 +553,8 @@ public sealed class GoldRateService(
                 "Configured User",
                 null,
                 null,
-                cancellationToken);
+                cancellationToken,
+                updateLastInteractedAt: false);
         }
     }
 

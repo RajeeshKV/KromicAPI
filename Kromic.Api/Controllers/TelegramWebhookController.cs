@@ -1099,19 +1099,18 @@ public sealed class TelegramWebhookController(
                 return;
             }
 
-            var dateGrouped = new Dictionary<string, decimal>();
+            var dateGrouped = new Dictionary<DateTime, decimal>();
             foreach (var rate in history.Items)
             {
                 var istDate = TimeZoneInfo.ConvertTime(rate.FetchedAt, indiaTimeZone);
-                var dateKey = istDate.ToString("dd MMM yyyy");
-                if (!dateGrouped.ContainsKey(dateKey))
+                var dateOnly = istDate.Date;
+                if (!dateGrouped.ContainsKey(dateOnly))
                 {
-                    dateGrouped[dateKey] = rate.R22KT;
+                    dateGrouped[dateOnly] = rate.R22KT;
                 }
             }
 
-            var sortedDates = dateGrouped.Keys.ToList();
-            sortedDates.Sort((a, b) => b.CompareTo(a));
+            var sortedDates = dateGrouped.Keys.OrderByDescending(d => d).ToList();
 
             var tableHeader = $"<b>{localizationService.GetString("commands.last_30_days", language)}</b>\n\n";
             tableHeader += "<code>Date          | 1g 22K | 8g 22K\n";
@@ -1124,7 +1123,8 @@ public sealed class TelegramWebhookController(
             {
                 var oneGramRate = dateGrouped[dateKey];
                 var eightGramRate = oneGramRate * 8;
-                var line = $"{dateKey,-13} | {oneGramRate,7:N0} | {eightGramRate,7:N0}\n";
+                var dateKeyFormatted = dateKey.ToString("dd MMM yyyy");
+                var line = $"{dateKeyFormatted,-13} | {oneGramRate,7:N0} | {eightGramRate,7:N0}\n";
 
                 if ((currentTableMessage + line + "</code>").Length > 4000)
                 {

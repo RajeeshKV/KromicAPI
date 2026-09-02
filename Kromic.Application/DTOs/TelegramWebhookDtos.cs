@@ -127,6 +127,25 @@ public sealed class LocalizedBroadcastRequest
     public string MalayalamMessage { get; set; } = string.Empty;
 }
 
+public sealed class IndividualMessageRequest
+{
+    public string ChatId { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+}
+
+public sealed class LocalizedIndividualMessageRequest
+{
+    public string ChatId { get; set; } = string.Empty;
+    public string EnglishMessage { get; set; } = string.Empty;
+    public string MalayalamMessage { get; set; } = string.Empty;
+}
+
+public sealed record IndividualMessageResponse(
+    bool Success,
+    string Message,
+    string ChatId,
+    string? RecipientName);
+
 public sealed record TelegramFeedbackNotification(
     string ChatId,
     string? FirstName,

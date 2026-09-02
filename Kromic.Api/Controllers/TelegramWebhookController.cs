@@ -1104,13 +1104,25 @@ public sealed class TelegramWebhookController(
             {
                 var istDate = TimeZoneInfo.ConvertTime(rate.FetchedAt, indiaTimeZone);
                 var dateOnly = istDate.Date;
+                
+                logger.LogDebug("Processing rate: FetchedAt={FetchedAt}, ISTDate={ISTDate}, DateOnly={DateOnly}, Rate={Rate}",
+                    rate.FetchedAt, istDate, dateOnly, rate.R22KT);
+                
                 if (!dateGrouped.ContainsKey(dateOnly))
                 {
                     dateGrouped[dateOnly] = rate.R22KT;
                 }
             }
 
+            // Sort by date in descending order (newest first)
             var sortedDates = dateGrouped.Keys.OrderByDescending(d => d).ToList();
+            
+            logger.LogInformation(
+                "Last month rates: Total unique dates: {Count}, Date range: {MinDate} to {MaxDate}, Sorted dates: {SortedDates}", 
+                sortedDates.Count,
+                sortedDates.LastOrDefault(),
+                sortedDates.FirstOrDefault(),
+                string.Join(", ", sortedDates.Take(5).Select(d => d.ToString("dd MMM yyyy"))));
 
             var tableHeader = $"<b>{localizationService.GetString("commands.last_30_days", language)}</b>\n\n";
             tableHeader += "<code>Date          | 1g 22K | 8g 22K\n";

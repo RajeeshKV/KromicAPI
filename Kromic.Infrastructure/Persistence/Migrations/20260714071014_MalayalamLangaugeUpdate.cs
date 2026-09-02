@@ -71,7 +71,7 @@ namespace Kromic.Infrastructure.Persistence.Migrations
                             INSERT INTO ""LocalizationResources"" (""Id"", ""Language"", ""Key"", ""Value"", ""CreatedAt"", ""UpdatedAt"")
                             VALUES (gen_random_uuid(), 'ml', r.k, r.v, NOW(), NOW());
                         END IF;
-                    LOOP;
+                    END LOOP;
                 END $$;
             ");
         }

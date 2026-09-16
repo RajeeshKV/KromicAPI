@@ -139,6 +139,12 @@ public sealed class GoldRateService(
             .AsNoTracking()
             .MinAsync(x => (decimal?)x.R22KT, cancellationToken);
 
+        // Track what actually changed for selective notifications
+        var goldChanged = latestToday == null || latestToday.R22KT != data.R22KT;
+        var silverChanged = latestToday != null
+                            && latestToday.SilverRate != null       // only meaningful once migration has run
+                            && latestToday.SilverRate != data.SilverRate;
+
         var isLowest = previousLowest.HasValue && data.R22KT < previousLowest.Value;
         var snapshot = new GoldRateSnapshot
         {
@@ -159,21 +165,27 @@ public sealed class GoldRateService(
         // Sync any new Telegram users from configured environment
         await SyncConfiguredTelegramUsersAsync(cancellationToken);
 
-        if (sendRegularEmail)
+        // Email: only when gold changed
+        if (sendRegularEmail && goldChanged)
         {
             snapshot.RegularEmailMessageId = await SendRateEmailAsync(snapshot, isLowestAlert: false, cancellationToken);
-            await SendRateTelegramAsync(snapshot, isLowestAlert: false, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        // Telegram: whenever gold or silver changed
+        if (goldChanged || silverChanged)
+        {
+            await SendRateTelegramAsync(snapshot, isLowestAlert: false, goldChanged, silverChanged, cancellationToken);
         }
 
         if (sendLowestAlert && isLowest)
         {
             snapshot.LowestAlertMessageId = await SendRateEmailAsync(snapshot, isLowestAlert: true, cancellationToken);
-            await SendRateTelegramAsync(snapshot, isLowestAlert: true, cancellationToken);
+            await SendRateTelegramAsync(snapshot, isLowestAlert: true, goldChanged: true, silverChanged: false, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return new GoldRateFetchResponse(ToResponse(snapshot), sendRegularEmail, sendLowestAlert && isLowest, RateChanged: true);
+        return new GoldRateFetchResponse(ToResponse(snapshot), sendRegularEmail && goldChanged, sendLowestAlert && isLowest, RateChanged: goldChanged || silverChanged);
     }
     private async Task<GoldRateApiResponse?> FetchLatestGoldRateAsync(CancellationToken cancellationToken)
     {
@@ -678,6 +690,8 @@ public sealed class GoldRateService(
     private async Task SendRateTelegramAsync(
         GoldRateSnapshot snapshot,
         bool isLowestAlert,
+        bool goldChanged,
+        bool silverChanged,
         CancellationToken cancellationToken)
     {
         var istFetchedAt = TimeZoneInfo.ConvertTime(snapshot.FetchedAt, GetIndiaTimeZone());
@@ -733,12 +747,6 @@ public sealed class GoldRateService(
             logger.LogWarning("No Telegram chat IDs found for sending rate notifications.");
             return;
         }
-
-        // Determine what changed vs previous snapshot
-        var goldChanged = previousSnapshot == null || snapshot.R22KT != previousSnapshot.R22KT;
-        var silverChanged = previousSnapshot == null ||
-                            (snapshot.SilverRate.HasValue &&
-                             snapshot.SilverRate != previousSnapshot.SilverRate);
 
         foreach (var chatId in allChatIds)
         {

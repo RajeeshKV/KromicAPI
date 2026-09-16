@@ -46,7 +46,10 @@ public static class DependencyInjection
             {
                 AutomaticDecompression = System.Net.DecompressionMethods.GZip
                                        | System.Net.DecompressionMethods.Deflate
-                                       | System.Net.DecompressionMethods.Brotli
+                                       | System.Net.DecompressionMethods.Brotli,
+                UseCookies = true,
+                CookieContainer = new System.Net.CookieContainer(),
+                AllowAutoRedirect = true
             });
         services.AddHttpClient<ITelegramService, TelegramService>();
         services.AddHttpClient<ITransactionalEmailService, BrevoTransactionalEmailService>((serviceProvider, client) =>

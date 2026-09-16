@@ -150,23 +150,53 @@ public sealed class GoldRateService(
 
     private async Task<GoldRateApiResponse?> FetchAkgsmaGoldRateAsync(CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, _options.Endpoint);
+        // Litespeed bot protection sets a session cookie on first visit.
+        // We do a warm-up GET first so the cookie jar is seeded, then
+        // the real request carries that cookie and passes the bot check.
+        var browserHeaders = new (string Name, string Value)[]
+        {
+            ("User-Agent",               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"),
+            ("Accept",                   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"),
+            ("Accept-Language",          "en-US,en;q=0.9"),
+            ("Connection",               "keep-alive"),
+            ("Upgrade-Insecure-Requests","1"),
+            ("Cache-Control",            "no-cache"),
+            ("Sec-Fetch-Dest",           "document"),
+            ("Sec-Fetch-Mode",           "navigate"),
+            ("Sec-Fetch-Site",           "none"),
+            ("Sec-Fetch-User",           "?1"),
+        };
 
-        // Mimic a real browser request to avoid bot detection (403 reCAPTCHA block)
-        request.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36");
-        request.Headers.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8");
-        request.Headers.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");
-        // Accept-Encoding is set automatically by HttpClientHandler.AutomaticDecompression
-        request.Headers.TryAddWithoutValidation("Connection", "keep-alive");
-        request.Headers.TryAddWithoutValidation("Upgrade-Insecure-Requests", "1");
+        // --- Warm-up request (seeds cookies) ---
+        try
+        {
+            using var warmup = new HttpRequestMessage(HttpMethod.Get, _options.Endpoint);
+            foreach (var (name, value) in browserHeaders)
+                warmup.Headers.TryAddWithoutValidation(name, value);
+
+            using var warmupResponse = await httpClient.SendAsync(warmup, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            logger.LogDebug("AKGSMA warm-up responded with {Status}", (int)warmupResponse.StatusCode);
+
+            // Small delay to mimic a real browser pause between requests
+            await Task.Delay(TimeSpan.FromSeconds(1.5), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "AKGSMA warm-up request failed; proceeding anyway.");
+        }
+
+        // --- Real request (carries cookies from warm-up) ---
+        using var request = new HttpRequestMessage(HttpMethod.Get, _options.Endpoint);
+        foreach (var (name, value) in browserHeaders)
+            request.Headers.TryAddWithoutValidation(name, value);
+
+        // Referer makes it look like we navigated from the same site
+        request.Headers.TryAddWithoutValidation("Referer", _options.Endpoint);
         request.Headers.TryAddWithoutValidation("Cache-Control", "max-age=0");
-        request.Headers.TryAddWithoutValidation("Sec-Fetch-Dest", "document");
-        request.Headers.TryAddWithoutValidation("Sec-Fetch-Mode", "navigate");
-        request.Headers.TryAddWithoutValidation("Sec-Fetch-Site", "none");
-        request.Headers.TryAddWithoutValidation("Sec-Fetch-User", "?1");
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
         var html = await response.Content.ReadAsStringAsync(cancellationToken);
+
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException(

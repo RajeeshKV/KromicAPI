@@ -118,14 +118,21 @@ public sealed class GoldRateService(
             .OrderByDescending(x => x.FetchedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (latestToday is not null && latestToday.R22KT == data.R22KT && latestToday.SilverRate == data.SilverRate)
+        // Skip if nothing changed. For silver: if previously null (pre-migration rows),
+        // treat as unchanged so a silver column addition alone doesn't retrigger notifications.
+        if (latestToday is not null && latestToday.R22KT == data.R22KT)
         {
-            logger.LogInformation(
-                "Gold and silver rates unchanged for {Date}. 22K: {GoldRate}, Silver: {SilverRate}. Skipping save and notifications.",
-                TimeZoneInfo.ConvertTime(fetchedAt, GetIndiaTimeZone()).Date,
-                data.R22KT,
-                data.SilverRate);
-            return new GoldRateFetchResponse(ToResponse(latestToday), RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
+            var silverUnchanged = latestToday.SilverRate == null  // pre-migration row, ignore silver
+                                  || latestToday.SilverRate == data.SilverRate;
+            if (silverUnchanged)
+            {
+                logger.LogInformation(
+                    "Gold and silver rates unchanged for {Date}. 22K: {GoldRate}, Silver: {SilverRate}. Skipping save and notifications.",
+                    TimeZoneInfo.ConvertTime(fetchedAt, GetIndiaTimeZone()).Date,
+                    data.R22KT,
+                    data.SilverRate);
+                return new GoldRateFetchResponse(ToResponse(latestToday), RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
+            }
         }
 
         var previousLowest = await dbContext.GoldRateSnapshots

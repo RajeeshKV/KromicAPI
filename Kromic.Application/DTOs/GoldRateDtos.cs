@@ -6,6 +6,7 @@ public sealed record GoldRateSnapshotResponse(
     bool R22KTShow,
     decimal? R18KT,
     decimal? R24KT,
+    decimal? SilverRate,
     DateTimeOffset? SourceLastUpdatedAt,
     DateTimeOffset FetchedAt,
     bool IsLowestAtFetch,

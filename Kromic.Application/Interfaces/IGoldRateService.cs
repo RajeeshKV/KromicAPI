@@ -21,4 +21,11 @@ public interface IGoldRateService
         DateTimeOffset? from,
         DateTimeOffset? to,
         CancellationToken cancellationToken);
+
+    Task<decimal?> GetCurrentSilverRateAsync(CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<GoldRateSnapshotResponse>> GetSilverHistoryAsync(
+        DateTimeOffset? from,
+        DateTimeOffset? to,
+        CancellationToken cancellationToken);
 }

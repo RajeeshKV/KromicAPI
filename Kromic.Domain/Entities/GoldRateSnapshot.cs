@@ -8,6 +8,7 @@ public sealed class GoldRateSnapshot
     public bool R22KTShow { get; set; }
     public decimal? R18KT { get; set; }
     public decimal? R24KT { get; set; }
+    public decimal? SilverRate { get; set; }
     public DateTimeOffset? SourceLastUpdatedAt { get; set; }
     public DateTimeOffset FetchedAt { get; set; } = DateTimeOffset.UtcNow;
     public bool IsLowestAtFetch { get; set; }

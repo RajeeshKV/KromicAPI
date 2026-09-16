@@ -271,6 +271,14 @@ public sealed class TelegramWebhookController(
         {
             await ShowDatePickerAsync(chatId, language, cancellationToken);
         }
+        else if (command == "/silverrate")
+        {
+            await SendCurrentSilverRateAsync(chatId, cancellationToken, language);
+        }
+        else if (command == "/stop")
+        {
+            await StopAllNotificationsAsync(chatId, cancellationToken, language);
+        }
     }
 
     private async Task HandleCallbackQueryAsync(TelegramCallbackQuery callbackQuery, CancellationToken cancellationToken)
@@ -337,9 +345,25 @@ public sealed class TelegramWebhookController(
                 menu = GetMainMenu(language);
                 break;
 
+            case "gold":
+                message = localizationService.GetString("commands.menu_gold_rates", language);
+                menu = GetGoldMenu(language);
+                break;
+
+            case "silver":
+                message = localizationService.GetString("commands.menu_silver_rates", language);
+                menu = GetSilverMenu(language);
+                break;
+
             case "reports":
+            case "gold_reports":
                 message = localizationService.GetString("commands.menu_reports", language);
-                menu = GetReportsMenu(language);
+                menu = GetGoldReportsMenu(language);
+                break;
+
+            case "silver_reports":
+                message = localizationService.GetString("commands.menu_reports", language);
+                menu = GetSilverReportsMenu(language);
                 break;
 
             case "settings":
@@ -356,20 +380,39 @@ public sealed class TelegramWebhookController(
                 return;
 
             case "currentrate":
+            case "gold_currentrate":
                 await SendCurrentRateAsync(chatId, cancellationToken, language);
                 return;
 
+            case "silver_currentrate":
+                await SendCurrentSilverRateAsync(chatId, cancellationToken, language);
+                return;
+
             case "last30days":
+            case "gold_last30days":
                 await SendLastOneMonthRatesAsync(chatId, cancellationToken, language);
                 return;
 
+            case "silver_last30days":
+                await SendSilverLastOneMonthRatesAsync(chatId, cancellationToken, language);
+                return;
+
             case "highestlowest":
+            case "gold_highestlowest":
                 await SendHighestLowestAsync(chatId, cancellationToken, language);
                 return;
 
+            case "silver_highestlowest":
+                await SendSilverHighestLowestAsync(chatId, cancellationToken, language);
+                return;
+
             case "weeklysummary":
-                // Trigger weekly summary manually (for testing)
+            case "gold_weeklysummary":
                 await SendWeeklySummaryAsync(chatId, cancellationToken, language);
+                return;
+
+            case "silver_weeklysummary":
+                await SendSilverWeeklySummaryAsync(chatId, cancellationToken, language);
                 return;
 
             case "language":
@@ -510,6 +553,10 @@ public sealed class TelegramWebhookController(
                 await ShowDatePickerAsync(chatId, language, cancellationToken, param);
                 return;
 
+            case "stop":
+                await StopAllNotificationsAsync(chatId, cancellationToken, language);
+                return;
+
             default:
                 message = localizationService.GetString("commands.menu_main", language);
                 menu = GetMainMenu(language);
@@ -533,8 +580,8 @@ public sealed class TelegramWebhookController(
             {
                 Buttons = new List<TelegramMenuButton>
                 {
-                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_current_rate", language), CallbackData = "menu:currentrate" },
-                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_reports", language), CallbackData = "menu:reports" }
+                    new TelegramMenuButton { Text = "📈 " + localizationService.GetString("commands.menu_gold_rates", language), CallbackData = "menu:gold" },
+                    new TelegramMenuButton { Text = "🥈 " + localizationService.GetString("commands.menu_silver_rates", language), CallbackData = "menu:silver" }
                 }
             },
             new TelegramMenuRow
@@ -555,7 +602,7 @@ public sealed class TelegramWebhookController(
         };
     }
 
-    private List<TelegramMenuRow> GetReportsMenu(string language)
+    private List<TelegramMenuRow> GetGoldMenu(string language)
     {
         return new List<TelegramMenuRow>
         {
@@ -563,21 +610,14 @@ public sealed class TelegramWebhookController(
             {
                 Buttons = new List<TelegramMenuButton>
                 {
-                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_last_30_days", language), CallbackData = "menu:last30days" }
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_current_rate", language), CallbackData = "menu:gold_currentrate" }
                 }
             },
             new TelegramMenuRow
             {
                 Buttons = new List<TelegramMenuButton>
                 {
-                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_weekly_summary", language), CallbackData = "menu:weeklysummary" }
-                }
-            },
-            new TelegramMenuRow
-            {
-                Buttons = new List<TelegramMenuButton>
-                {
-                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_highest_lowest", language), CallbackData = "menu:highestlowest" }
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_reports", language), CallbackData = "menu:gold_reports" }
                 }
             },
             new TelegramMenuRow
@@ -585,6 +625,109 @@ public sealed class TelegramWebhookController(
                 Buttons = new List<TelegramMenuButton>
                 {
                     new TelegramMenuButton { Text = localizationService.GetString("commands.menu_back", language), CallbackData = "menu:main" }
+                }
+            }
+        };
+    }
+
+    private List<TelegramMenuRow> GetSilverMenu(string language)
+    {
+        return new List<TelegramMenuRow>
+        {
+            new TelegramMenuRow
+            {
+                Buttons = new List<TelegramMenuButton>
+                {
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_silver_current_rate", language), CallbackData = "menu:silver_currentrate" }
+                }
+            },
+            new TelegramMenuRow
+            {
+                Buttons = new List<TelegramMenuButton>
+                {
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_reports", language), CallbackData = "menu:silver_reports" }
+                }
+            },
+            new TelegramMenuRow
+            {
+                Buttons = new List<TelegramMenuButton>
+                {
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_back", language), CallbackData = "menu:main" }
+                }
+            }
+        };
+    }
+
+    private List<TelegramMenuRow> GetReportsMenu(string language)
+    {
+        return GetGoldReportsMenu(language);
+    }
+
+    private List<TelegramMenuRow> GetGoldReportsMenu(string language)
+    {
+        return new List<TelegramMenuRow>
+        {
+            new TelegramMenuRow
+            {
+                Buttons = new List<TelegramMenuButton>
+                {
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_last_30_days", language), CallbackData = "menu:gold_last30days" }
+                }
+            },
+            new TelegramMenuRow
+            {
+                Buttons = new List<TelegramMenuButton>
+                {
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_weekly_summary", language), CallbackData = "menu:gold_weeklysummary" }
+                }
+            },
+            new TelegramMenuRow
+            {
+                Buttons = new List<TelegramMenuButton>
+                {
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_highest_lowest", language), CallbackData = "menu:gold_highestlowest" }
+                }
+            },
+            new TelegramMenuRow
+            {
+                Buttons = new List<TelegramMenuButton>
+                {
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_back", language), CallbackData = "menu:gold" }
+                }
+            }
+        };
+    }
+
+    private List<TelegramMenuRow> GetSilverReportsMenu(string language)
+    {
+        return new List<TelegramMenuRow>
+        {
+            new TelegramMenuRow
+            {
+                Buttons = new List<TelegramMenuButton>
+                {
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_last_30_days", language), CallbackData = "menu:silver_last30days" }
+                }
+            },
+            new TelegramMenuRow
+            {
+                Buttons = new List<TelegramMenuButton>
+                {
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_weekly_summary", language), CallbackData = "menu:silver_weeklysummary" }
+                }
+            },
+            new TelegramMenuRow
+            {
+                Buttons = new List<TelegramMenuButton>
+                {
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_highest_lowest", language), CallbackData = "menu:silver_highestlowest" }
+                }
+            },
+            new TelegramMenuRow
+            {
+                Buttons = new List<TelegramMenuButton>
+                {
+                    new TelegramMenuButton { Text = localizationService.GetString("commands.menu_back", language), CallbackData = "menu:silver" }
                 }
             }
         };
@@ -1228,15 +1371,61 @@ public sealed class TelegramWebhookController(
     private async Task UnsubscribeEmailAsync(string chatId, CancellationToken cancellationToken, string language = "en")
     {
         var subscription = await emailSubscriptionService.GetByChatIdAsync(chatId, cancellationToken);
-        if (subscription == null)
+
+        if (subscription == null || string.IsNullOrWhiteSpace(subscription.Email))
         {
-            await telegramService.SendMessageToChatIdAsync(chatId, "No email subscription found for your account.", cancellationToken);
+            await telegramService.SendMessageToChatIdAsync(chatId,
+                "No email subscription found for your account. Send /emailalerts to subscribe.",
+                cancellationToken);
             return;
         }
 
-        await emailSubscriptionService.UnsubscribeAsync(subscription.UnsubscribeToken, cancellationToken);
-        var message = localizationService.GetString("commands.unsubscribeemail", language);
-        await telegramService.SendMessageToChatIdAsync(chatId, message, cancellationToken);
+        if (!subscription.IsActive)
+        {
+            await telegramService.SendMessageToChatIdAsync(chatId,
+                $"Your email <b>{subscription.Email}</b> is already unsubscribed. Send /emailalerts to subscribe again.",
+                cancellationToken);
+            return;
+        }
+
+        var success = await emailSubscriptionService.UnsubscribeAsync(subscription.UnsubscribeToken, cancellationToken);
+        if (success)
+        {
+            var message = localizationService.GetString("commands.unsubscribeemail", language);
+            if (message.StartsWith("commands."))
+                message = $"Email alerts disabled for <b>{subscription.Email}</b>. Send /emailalerts to subscribe again.";
+            await telegramService.SendMessageToChatIdAsync(chatId, message, cancellationToken);
+        }
+        else
+        {
+            await telegramService.SendMessageToChatIdAsync(chatId,
+                "Could not unsubscribe. Please try again or contact support.",
+                cancellationToken);
+        }
+    }
+
+    private async Task StopAllNotificationsAsync(string chatId, CancellationToken cancellationToken, string language = "en")
+    {
+        // Pause Telegram notifications
+        await userSettingsService.SetTelegramNotificationsAsync(chatId, false, cancellationToken);
+
+        // Unsubscribe email if subscribed
+        var emailUnsubscribed = false;
+        var subscription = await emailSubscriptionService.GetByChatIdAsync(chatId, cancellationToken);
+        if (subscription?.IsActive == true && !string.IsNullOrWhiteSpace(subscription.UnsubscribeToken))
+        {
+            emailUnsubscribed = await emailSubscriptionService.UnsubscribeAsync(subscription.UnsubscribeToken, cancellationToken);
+        }
+
+        var parts = new List<string> { "✅ Telegram notifications stopped." };
+        if (emailUnsubscribed)
+            parts.Add("✅ Email alerts unsubscribed.");
+
+        parts.Add("\nSend /resume to turn Telegram notifications back on.");
+        parts.Add("Send /emailalerts to re-subscribe to email alerts.");
+
+        await telegramService.SendMessageToChatIdAsync(chatId, string.Join("\n", parts), cancellationToken);
+        logger.LogInformation("User {ChatId} stopped all notifications. Email unsubscribed: {EmailUnsubscribed}", chatId, emailUnsubscribed);
     }
 
     private async Task SendSettingsAsync(string chatId, CancellationToken cancellationToken, string language = "en")
@@ -1323,6 +1512,200 @@ public sealed class TelegramWebhookController(
             logger.LogError(ex, "Error sending highest/lowest to user {ChatId}", chatId);
             var errorMessage = "<b>Error</b>\n\nFailed to generate report. Please try again later.";
             await telegramService.SendMessageToChatIdAsync(chatId, errorMessage, cancellationToken);
+        }
+    }
+
+    // ── Silver rate handlers ──────────────────────────────────────────────────
+
+    private async Task SendCurrentSilverRateAsync(string chatId, CancellationToken cancellationToken, string language = "en")
+    {
+        try
+        {
+            var indiaTimeZone = GetIndiaTimeZone();
+            var history = await goldRateService.GetSilverHistoryAsync(null, null, cancellationToken);
+            var current = history.FirstOrDefault();
+
+            if (current?.SilverRate == null)
+            {
+                await telegramService.SendMessageToChatIdAsync(chatId, "<b>🥈 Silver Rate</b>\n\n<i>No silver rate data available yet.</i>", cancellationToken);
+                return;
+            }
+
+            var istFetchedAt = TimeZoneInfo.ConvertTime(current.FetchedAt, indiaTimeZone);
+            var silver = current.SilverRate.Value;
+
+            // Change vs previous
+            var previous = history.Skip(1).FirstOrDefault();
+            var changeStr = string.Empty;
+            if (previous?.SilverRate != null)
+            {
+                var diff = silver - previous.SilverRate.Value;
+                var emoji = diff > 0 ? "🔺" : diff < 0 ? "🔻" : "➡️";
+                changeStr = diff != 0 ? $" ({emoji} {Math.Abs(diff):N2})" : " (➡️ 0.00)";
+            }
+
+            var message = $"<b>🥈 {localizationService.GetString("commands.menu_silver_current_rate", language)}</b>\n\n" +
+                          $"1g:   Rs. {silver:N2}{changeStr}\n" +
+                          $"10g:  Rs. {silver * 10:N2}\n" +
+                          $"100g: Rs. {silver * 100:N2}\n" +
+                          $"1kg:  Rs. {silver * 1000:N0}\n\n" +
+                          $"<i>Fetched at: {istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
+
+            await telegramService.SendMessageToChatIdAsync(chatId, message, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error sending silver rate to user {ChatId}", chatId);
+            await telegramService.SendMessageToChatIdAsync(chatId, "<b>Error</b>\n\nFailed to fetch silver rate. Please try again later.", cancellationToken);
+        }
+    }
+
+    private async Task SendSilverLastOneMonthRatesAsync(string chatId, CancellationToken cancellationToken, string language = "en")
+    {
+        try
+        {
+            var indiaTimeZone = GetIndiaTimeZone();
+            var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, indiaTimeZone);
+            var thirtyDaysAgo = now.AddDays(-30);
+
+            var items = await goldRateService.GetSilverHistoryAsync(thirtyDaysAgo, now, cancellationToken);
+
+            if (items.Count == 0)
+            {
+                await telegramService.SendMessageToChatIdAsync(chatId,
+                    $"<b>🥈 Last 30 Days Silver Rate</b>\n\n<i>No data available.</i>", cancellationToken);
+                return;
+            }
+
+            var dateGrouped = new Dictionary<DateTime, decimal>();
+            foreach (var item in items)
+            {
+                if (item.SilverRate == null) continue;
+                var date = TimeZoneInfo.ConvertTime(item.FetchedAt, indiaTimeZone).Date;
+                if (!dateGrouped.ContainsKey(date))
+                    dateGrouped[date] = item.SilverRate.Value;
+            }
+
+            var sortedDates = dateGrouped.Keys.OrderByDescending(d => d).ToList();
+
+            var header = "<b>🥈 Last 30 Days Silver Rate</b>\n\n";
+            header += "<code>Date          |  1g  |   10g\n";
+            header += "------------------------------------\n";
+
+            var tableLines = new List<string> { header };
+            var current = header;
+
+            foreach (var date in sortedDates)
+            {
+                var r = dateGrouped[date];
+                var line = $"{date:dd MMM yyyy,-13} | {r,4:N0} | {r * 10,6:N0}\n";
+                if ((current + line + "</code>").Length > 4000)
+                {
+                    current += "</code>";
+                    tableLines.Add(current);
+                    current = "<code>" + line;
+                }
+                else
+                {
+                    current += line;
+                }
+            }
+
+            if (!current.EndsWith("</code>")) current += "</code>";
+            tableLines.Add(current);
+            tableLines = tableLines.Where(m => !string.IsNullOrWhiteSpace(m) && m != "<code></code>").ToList();
+
+            foreach (var msg in tableLines)
+                await telegramService.SendMessageToChatIdAsync(chatId, msg, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error sending silver last-month-rates to user {ChatId}", chatId);
+            await telegramService.SendMessageToChatIdAsync(chatId, "<b>Error</b>\n\nFailed to generate report. Please try again later.", cancellationToken);
+        }
+    }
+
+    private async Task SendSilverHighestLowestAsync(string chatId, CancellationToken cancellationToken, string language = "en")
+    {
+        try
+        {
+            var indiaTimeZone = GetIndiaTimeZone();
+            var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, indiaTimeZone);
+            var thirtyDaysAgo = now.AddDays(-30);
+
+            var items = await goldRateService.GetSilverHistoryAsync(thirtyDaysAgo, now, cancellationToken);
+
+            if (items.Count == 0)
+            {
+                await telegramService.SendMessageToChatIdAsync(chatId,
+                    "<b>🥈 Silver Highest & Lowest (30 Days)</b>\n\n<i>No data available.</i>", cancellationToken);
+                return;
+            }
+
+            var withRates = items.Where(x => x.SilverRate.HasValue).ToList();
+            var highest = withRates.OrderByDescending(x => x.SilverRate!.Value).First();
+            var lowest  = withRates.OrderBy(x => x.SilverRate!.Value).First();
+
+            var highestDate = TimeZoneInfo.ConvertTime(highest.FetchedAt, indiaTimeZone);
+            var lowestDate  = TimeZoneInfo.ConvertTime(lowest.FetchedAt, indiaTimeZone);
+
+            var message = "<b>🥈 Silver Highest & Lowest (30 Days)</b>\n\n" +
+                          $"<b>📈 Highest</b>\n" +
+                          $"1g: Rs. {highest.SilverRate!.Value:N2}\n" +
+                          $"<i>Date: {highestDate:dd MMM yyyy} IST</i>\n\n" +
+                          $"<b>📉 Lowest</b>\n" +
+                          $"1g: Rs. {lowest.SilverRate!.Value:N2}\n" +
+                          $"<i>Date: {lowestDate:dd MMM yyyy} IST</i>";
+
+            await telegramService.SendMessageToChatIdAsync(chatId, message, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error sending silver highest/lowest to user {ChatId}", chatId);
+            await telegramService.SendMessageToChatIdAsync(chatId, "<b>Error</b>\n\nFailed to generate report. Please try again later.", cancellationToken);
+        }
+    }
+
+    private async Task SendSilverWeeklySummaryAsync(string chatId, CancellationToken cancellationToken, string language = "en")
+    {
+        try
+        {
+            var indiaTimeZone = GetIndiaTimeZone();
+            var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, indiaTimeZone);
+            var sevenDaysAgo = now.AddDays(-7);
+
+            var items = await goldRateService.GetSilverHistoryAsync(sevenDaysAgo, now, cancellationToken);
+            var rates = items.Where(x => x.SilverRate.HasValue).Select(x => x.SilverRate!.Value).ToList();
+
+            if (rates.Count == 0)
+            {
+                await telegramService.SendMessageToChatIdAsync(chatId,
+                    "<b>🥈 Weekly Silver Summary</b>\n\n<i>No data available.</i>", cancellationToken);
+                return;
+            }
+
+            var avg  = rates.Average();
+            var min  = rates.Min();
+            var max  = rates.Max();
+            var first = rates.Last();
+            var last  = rates.First();
+            var trend = last > first ? "📈 Up" : last < first ? "📉 Down" : "➡️ Stable";
+            var trendAmt = Math.Abs(last - first);
+
+            var message = $"<b>📊 Weekly Silver Summary</b>\n" +
+                          $"<i>{sevenDaysAgo:dd MMM yyyy} - {now:dd MMM yyyy}</i>\n\n" +
+                          $"<b>Average:</b> Rs. {avg:N2}\n" +
+                          $"<b>Highest:</b> Rs. {max:N2}\n" +
+                          $"<b>Lowest:</b>  Rs. {min:N2}\n" +
+                          $"<b>Weekly Trend:</b> {trend} ({trendAmt:N2})\n" +
+                          $"<b>Current:</b> Rs. {last:N2}";
+
+            await telegramService.SendMessageToChatIdAsync(chatId, message, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error sending silver weekly summary to user {ChatId}", chatId);
+            await telegramService.SendMessageToChatIdAsync(chatId, "<b>Error</b>\n\nFailed to generate report. Please try again later.", cancellationToken);
         }
     }
 }

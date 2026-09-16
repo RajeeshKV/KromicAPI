@@ -41,7 +41,13 @@ public static class DependencyInjection
         services.AddSingleton<IPortfolioCache, MemoryPortfolioCache>();
         services.AddHostedService<GoldRateDailyWorker>();
         services.AddHostedService<WeeklySummaryWorker>();
-        services.AddHttpClient<IGoldRateService, GoldRateService>();
+        services.AddHttpClient<IGoldRateService, GoldRateService>()
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.GZip
+                                       | System.Net.DecompressionMethods.Deflate
+                                       | System.Net.DecompressionMethods.Brotli
+            });
         services.AddHttpClient<ITelegramService, TelegramService>();
         services.AddHttpClient<ITransactionalEmailService, BrevoTransactionalEmailService>((serviceProvider, client) =>
         {

@@ -45,6 +45,18 @@ public sealed class GoldRateService(
             throw new InvalidOperationException(source?.Message ?? "Gold rate endpoint did not return a successful response with usable Data.");
         }
 
+        // If the source provides a date and it's not today, skip — prevents stale data
+        // from being saved and triggering notifications before the rate is published.
+        if (data.LastUpdated is not null && !IsSourceDateTodayInIndia(data.LastUpdated))
+        {
+            logger.LogInformation(
+                "Skipping save — source data is not dated today (source date: {SourceDate}). Rate not yet published.",
+                data.LastUpdated);
+
+            var current = await GetCurrentAsync(cancellationToken);
+            return new GoldRateFetchResponse(current, RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
+        }
+
         return await StoreFetchedGoldRateAsync(data, sendRegularEmail, sendLowestAlert, cancellationToken);
     }
 
@@ -59,17 +71,33 @@ public sealed class GoldRateService(
             return null;
         }
 
-        var source = await FetchAkgsmaGoldRateAsync(cancellationToken);
+        GoldRateApiResponse? source = null;
+
+        // Try AKGSMA first; fall back to goodreturns.in if blocked
+        try
+        {
+            source = await FetchAkgsmaGoldRateAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "AKGSMA pre-market fetch failed, falling back to goodreturns.in.");
+        }
+
+        if (source is null)
+        {
+            source = await FetchGoodReturnsKeralaGoldRateAsync(cancellationToken);
+        }
+
         var data = source?.ReadData();
         if (source?.Success != true || data is null)
         {
-            throw new InvalidOperationException(source?.Message ?? "AKGSMA gold rate page did not return usable data.");
+            throw new InvalidOperationException(source?.Message ?? "Neither AKGSMA nor goodreturns.in returned usable data.");
         }
 
         if (!IsSourceDateTodayInIndia(data.LastUpdated))
         {
             logger.LogInformation(
-                "AKGSMA pre-market page is not dated today yet. Source date: {SourceDate}.",
+                "Pre-market page is not dated today yet. Source date: {SourceDate}.",
                 string.IsNullOrWhiteSpace(data.LastUpdated) ? "unavailable" : data.LastUpdated);
             return null;
         }
@@ -142,7 +170,18 @@ public sealed class GoldRateService(
     {
         if (IsAkgsmaEndpoint(_options.Endpoint))
         {
-            return await FetchAkgsmaGoldRateAsync(cancellationToken);
+            // Try AKGSMA first; fall back to goodreturns.in if blocked
+            try
+            {
+                var result = await FetchAkgsmaGoldRateAsync(cancellationToken);
+                if (result is not null) return result;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "AKGSMA fetch failed, falling back to goodreturns.in.");
+            }
+
+            return await FetchGoodReturnsKeralaGoldRateAsync(cancellationToken);
         }
 
         return await FetchJsonGoldRateAsync(cancellationToken);
@@ -204,6 +243,72 @@ public sealed class GoldRateService(
         }
 
         return ParseAkgsmaHtml(html);
+    }
+
+    private async Task<GoldRateApiResponse?> FetchGoodReturnsKeralaGoldRateAsync(CancellationToken cancellationToken)
+    {
+        const string url = "https://www.goodreturns.in/gold-rates/kerala.html";
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36");
+        request.Headers.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        request.Headers.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var html = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"goodreturns.in Kerala gold rate page failed with {(int)response.StatusCode} {response.ReasonPhrase}.");
+        }
+
+        return ParseGoodReturnsHtml(html);
+    }
+
+    private static GoldRateApiResponse ParseGoodReturnsHtml(string html)
+    {
+        // Matches: 22K Gold /g ... ₹14,065
+        var rateMatch = Regex.Match(
+            html,
+            @"22K\s+Gold\s*/g[\s\S]*?₹\s*([\d,]+(?:\.\d+)?)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        if (!rateMatch.Success)
+        {
+            throw new InvalidOperationException("goodreturns.in page did not contain a parseable 22K gold rate.");
+        }
+
+        var rateText = rateMatch.Groups[1].Value.Replace(",", string.Empty);
+        if (!decimal.TryParse(rateText, NumberStyles.Number, CultureInfo.InvariantCulture, out var r22Kt))
+        {
+            throw new InvalidOperationException($"goodreturns.in 22K rate could not be parsed: {rateText}");
+        }
+
+        // Try to extract the date from the page title e.g. "16 September 2026"
+        var dateMatch = Regex.Match(
+            html,
+            @"(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        string? dateString = dateMatch.Success ? dateMatch.Groups[1].Value : null;
+
+        // Convert "16 September 2026" → "16/09/2026" for ParseIndiaDateTime compatibility
+        string? parsedDate = null;
+        if (dateString is not null &&
+            DateTime.TryParse(dateString, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDt))
+        {
+            parsedDate = parsedDt.ToString("dd/MM/yyyy");
+        }
+
+        var data = new GoldRateApiData
+        {
+            Id = 0,
+            R22KT = r22Kt,
+            R22KTShow = true,
+            LastUpdated = parsedDate
+        };
+
+        return GoldRateApiResponse.FromData("goodreturns.in rate parsed successfully.", data);
     }
 
     private async Task<GoldRateApiResponse?> FetchJsonGoldRateAsync(CancellationToken cancellationToken)

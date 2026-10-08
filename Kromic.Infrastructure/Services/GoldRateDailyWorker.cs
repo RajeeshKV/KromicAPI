@@ -38,8 +38,18 @@ public sealed class GoldRateDailyWorker(
             }
 
             var akgsmaPreMarketStartHour = ResolveAkgsmaPreMarketStartHour(startHour);
-            var nextRun = GetNextRun(startHour, endHour, intervalMinutes, akgsmaPreMarketStartHour);
-            if (nextRun.IsAkgsmaPreMarket)
+            var failoverTriggerHour = NormalizeHour(_options.FailoverTriggerHour, fallback: 9);
+            var failoverTriggerMinute = NormalizeInterval(_options.FailoverTriggerMinute, fallback: 30);
+            var nextRun = GetNextRun(startHour, endHour, intervalMinutes, akgsmaPreMarketStartHour, failoverTriggerHour, failoverTriggerMinute);
+            if (nextRun.IsFailover)
+            {
+                logger.LogInformation(
+                    "Failover trigger scheduled in {Delay}. Backup providers will be queried at {Hour}:{Minute} IST.",
+                    nextRun.Delay,
+                    failoverTriggerHour,
+                    failoverTriggerMinute);
+            }
+            else if (nextRun.IsAkgsmaPreMarket)
             {
                 logger.LogInformation(
                     "Next AKGSMA pre-market gold rate fetch scheduled in {Delay}. Pre-market window: {PreMarketStartHour}:00-{StartHour}:00 IST, interval: {IntervalMinutes} minutes.",
@@ -64,7 +74,14 @@ public sealed class GoldRateDailyWorker(
             {
                 using var scope = scopeFactory.CreateScope();
                 var goldRateService = scope.ServiceProvider.GetRequiredService<IGoldRateService>();
-                if (nextRun.IsAkgsmaPreMarket)
+                if (nextRun.IsFailover)
+                {
+                    await goldRateService.FetchFromBackupProvidersAsync(
+                        sendRegularEmail: true,
+                        sendLowestAlert: true,
+                        stoppingToken);
+                }
+                else if (nextRun.IsAkgsmaPreMarket)
                 {
                     await goldRateService.FetchAkgsmaTodayAndStoreAsync(
                         sendRegularEmail: true,
@@ -85,9 +102,11 @@ public sealed class GoldRateDailyWorker(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, nextRun.IsAkgsmaPreMarket
-                    ? "Scheduled AKGSMA pre-market gold rate fetch failed."
-                    : "Scheduled gold rate fetch failed.");
+                logger.LogError(ex, nextRun.IsFailover
+                    ? "Failover backup provider fetch failed."
+                    : nextRun.IsAkgsmaPreMarket
+                        ? "Scheduled AKGSMA pre-market gold rate fetch failed."
+                        : "Scheduled gold rate fetch failed.");
             }
         }
     }
@@ -107,7 +126,9 @@ public sealed class GoldRateDailyWorker(
         int startHour,
         int endHour,
         int intervalMinutes,
-        int? akgsmaPreMarketStartHour)
+        int? akgsmaPreMarketStartHour,
+        int failoverTriggerHour,
+        int failoverTriggerMinute)
     {
         var indiaTimeZone = GetIndiaTimeZone();
         var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, indiaTimeZone);
@@ -118,6 +139,20 @@ public sealed class GoldRateDailyWorker(
             if (date.DayOfWeek == DayOfWeek.Sunday)
             {
                 continue;
+            }
+
+            // Failover trigger: if past 09:30 IST and no snapshot yet, schedule failover
+            if (dayOffset == 0)
+            {
+                var failoverTime = new DateTime(date.Year, date.Month, date.Day, failoverTriggerHour, failoverTriggerMinute, 0);
+                if (now >= failoverTime)
+                {
+                    var failoverDelay = ToDelay(failoverTime);
+                    if (failoverDelay <= TimeSpan.Zero)
+                    {
+                        return new ScheduledRun(TimeSpan.Zero, IsAkgsmaPreMarket: false, IsFailover: true);
+                    }
+                }
             }
 
             if (akgsmaPreMarketStartHour.HasValue)
@@ -131,7 +166,7 @@ public sealed class GoldRateDailyWorker(
                     includeEndHour: false);
                 if (preMarketRun.HasValue)
                 {
-                    return new ScheduledRun(ToDelay(preMarketRun.Value), IsAkgsmaPreMarket: true);
+                    return new ScheduledRun(ToDelay(preMarketRun.Value), IsAkgsmaPreMarket: true, IsFailover: false);
                 }
             }
 
@@ -144,12 +179,12 @@ public sealed class GoldRateDailyWorker(
                 includeEndHour: true);
             if (regularRun.HasValue)
             {
-                return new ScheduledRun(ToDelay(regularRun.Value), IsAkgsmaPreMarket: false);
+                return new ScheduledRun(ToDelay(regularRun.Value), IsAkgsmaPreMarket: false, IsFailover: false);
             }
         }
 
         var fallback = GetNextValidRunTime(now.AddDays(1), startHour);
-        return new ScheduledRun(ToDelay(fallback), IsAkgsmaPreMarket: false);
+        return new ScheduledRun(ToDelay(fallback), IsAkgsmaPreMarket: false, IsFailover: false);
     }
 
     private static DateTimeOffset? GetNextRunInWindow(
@@ -235,5 +270,5 @@ public sealed class GoldRateDailyWorker(
         }
     }
 
-    private sealed record ScheduledRun(TimeSpan Delay, bool IsAkgsmaPreMarket);
+    private sealed record ScheduledRun(TimeSpan Delay, bool IsAkgsmaPreMarket, bool IsFailover);
 }

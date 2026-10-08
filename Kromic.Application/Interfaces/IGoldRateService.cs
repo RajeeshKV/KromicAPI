@@ -14,6 +14,13 @@ public interface IGoldRateService
         bool sendLowestAlert,
         CancellationToken cancellationToken);
 
+    Task<GoldRateFetchResponse?> FetchFromBackupProvidersAsync(
+        bool sendRegularEmail,
+        bool sendLowestAlert,
+        CancellationToken cancellationToken);
+
+    Task<bool> HasSnapshotForTodayAsync(CancellationToken cancellationToken);
+
     Task<GoldRateSnapshotResponse?> GetCurrentAsync(CancellationToken cancellationToken);
 
     Task<GoldRateHistoryResponse> GetHistoryAsync(

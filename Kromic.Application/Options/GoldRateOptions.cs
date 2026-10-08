@@ -14,6 +14,9 @@ public sealed class GoldRateOptions
     public int ScheduleIntervalMinutes { get; set; } = 5;
     public bool AkgsmaPreMarketFetchEnabled { get; set; } = true;
     public int AkgsmaPreMarketStartHour { get; set; } = 6;
+    public int FailoverTriggerHour { get; set; } = 9;
+    public int FailoverTriggerMinute { get; set; } = 30;
+    public List<string> BackupProviders { get; set; } = ["goodreturns.in"];
     public string TelegramBotToken { get; set; } = string.Empty;
     public string TelegramChatIdsCsv { get; set; } = string.Empty;
     public List<string> TelegramChatIds { get; set; } = [];

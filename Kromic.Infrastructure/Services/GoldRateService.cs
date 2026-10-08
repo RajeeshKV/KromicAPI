@@ -105,6 +105,83 @@ public sealed class GoldRateService(
         return await StoreFetchedGoldRateAsync(data, sendRegularEmail, sendLowestAlert, cancellationToken);
     }
 
+    public async Task<bool> HasSnapshotForTodayAsync(CancellationToken cancellationToken)
+    {
+        var todayRange = GetIndiaDayRange(DateTimeOffset.UtcNow);
+        return await dbContext.GoldRateSnapshots
+            .AsNoTracking()
+            .AnyAsync(x => x.FetchedAt >= todayRange.StartUtc && x.FetchedAt < todayRange.EndUtc, cancellationToken);
+    }
+
+    public async Task<GoldRateFetchResponse?> FetchFromBackupProvidersAsync(
+        bool sendRegularEmail,
+        bool sendLowestAlert,
+        CancellationToken cancellationToken)
+    {
+        logger.LogInformation(
+            "Querying backup providers: {BackupProviders}.",
+            string.Join(", ", _options.BackupProviders));
+
+        foreach (var backupProvider in _options.BackupProviders)
+        {
+            var trimmed = backupProvider?.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                continue;
+            }
+
+            GoldRateApiResponse? source = null;
+            try
+            {
+                source = await FetchFromBackupProviderAsync(trimmed, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Backup provider '{Provider}' fetch failed. Trying next provider.", trimmed);
+                continue;
+            }
+
+            var data = source?.ReadData();
+            if (source?.Success != true || data is null)
+            {
+                logger.LogWarning(
+                    "Backup provider '{Provider}' did not return usable data. Trying next provider.", trimmed);
+                continue;
+            }
+
+            // Strict date validation: reject any data not dated today (IST)
+            if (!IsSourceDateTodayInIndia(data.LastUpdated))
+            {
+                logger.LogWarning(
+                    "Backup provider '{Provider}' returned data not dated today (source date: {SourceDate}). Rejecting and trying next provider.",
+                    trimmed,
+                    string.IsNullOrWhiteSpace(data.LastUpdated) ? "unavailable" : data.LastUpdated);
+                continue;
+            }
+
+            logger.LogInformation(
+                "Failover successful: backup provider '{Provider}' returned today's gold rate.", trimmed);
+
+            return await StoreFetchedGoldRateAsync(data, sendRegularEmail, sendLowestAlert, cancellationToken);
+        }
+
+        logger.LogWarning(
+            "All backup providers failed or returned non-today data. No gold rate notification dispatched.");
+        return null;
+    }
+
+    private async Task<GoldRateApiResponse?> FetchFromBackupProviderAsync(string provider, CancellationToken cancellationToken)
+    {
+        if (provider.Contains("goodreturns.in", StringComparison.OrdinalIgnoreCase))
+        {
+            return await FetchGoodReturnsKeralaGoldRateAsync(cancellationToken);
+        }
+
+        // Extensibility point: add additional backup provider fetchers here
+        throw new NotSupportedException($"Backup provider '{provider}' is not supported.");
+    }
+
     private async Task<GoldRateFetchResponse> StoreFetchedGoldRateAsync(
         GoldRateApiData data,
         bool sendRegularEmail,
@@ -118,12 +195,10 @@ public sealed class GoldRateService(
             .OrderByDescending(x => x.FetchedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Skip if nothing changed. For silver: if previously null (pre-migration rows),
-        // treat as unchanged so a silver column addition alone doesn't retrigger notifications.
+        // Skip if nothing changed (gold rate AND silver rate both identical to latest today)
         if (latestToday is not null && latestToday.R22KT == data.R22KT)
         {
-            var silverUnchanged = latestToday.SilverRate == null  // pre-migration row, ignore silver
-                                  || latestToday.SilverRate == data.SilverRate;
+            var silverUnchanged = latestToday.SilverRate == data.SilverRate;
             if (silverUnchanged)
             {
                 logger.LogInformation(
@@ -141,9 +216,9 @@ public sealed class GoldRateService(
 
         // Track what actually changed for selective notifications
         var goldChanged = latestToday == null || latestToday.R22KT != data.R22KT;
-        var silverChanged = latestToday != null
-                            && latestToday.SilverRate != null       // only meaningful once migration has run
-                            && latestToday.SilverRate != data.SilverRate;
+        var silverChanged = latestToday == null
+            ? data.SilverRate.HasValue
+            : latestToday.SilverRate != data.SilverRate;
 
         var isLowest = previousLowest.HasValue && data.R22KT < previousLowest.Value;
         var snapshot = new GoldRateSnapshot

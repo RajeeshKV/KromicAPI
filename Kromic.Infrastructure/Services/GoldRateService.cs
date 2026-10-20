@@ -219,11 +219,14 @@ public sealed class GoldRateService(
             .AsNoTracking()
             .MinAsync(x => (decimal?)x.R22KT, cancellationToken);
 
-        // Track what actually changed for selective notifications
+        // Track what actually changed for selective notifications.
+        // Silver is only "changed" when both the previous and current values are real numbers
+        // and they differ. A null result (e.g. backup provider that has no silver data) is
+        // treated as "no data" — never as a change that warrants a notification.
         var goldChanged = latestToday == null || latestToday.R22KT != data.R22KT;
-        var silverChanged = latestToday == null
-            ? data.SilverRate.HasValue
-            : latestToday.SilverRate != data.SilverRate;
+        var silverChanged = latestToday?.SilverRate.HasValue == true
+            && data.SilverRate.HasValue
+            && latestToday.SilverRate != data.SilverRate;
 
         var isLowest = previousLowest.HasValue && data.R22KT < previousLowest.Value;
         var snapshot = new GoldRateSnapshot
@@ -916,8 +919,7 @@ public sealed class GoldRateService(
                     {
                         Buttons = new List<TelegramMenuButton>
                         {
-                            new TelegramMenuButton { Text = "🛑 Stop Gold Notifications",   CallbackData = "menu:stop_gold" },
-                            new TelegramMenuButton { Text = "🛑 Stop Silver Notifications", CallbackData = "menu:stop_silver" }
+                            new TelegramMenuButton { Text = "🛑 Stop Gold Notifications", CallbackData = "menu:stop_gold" }
                         }
                     }
                 };
@@ -928,8 +930,7 @@ public sealed class GoldRateService(
                     {
                         Buttons = new List<TelegramMenuButton>
                         {
-                            new TelegramMenuButton { Text = "🛑 Stop Silver Notifications", CallbackData = "menu:stop_silver" },
-                            new TelegramMenuButton { Text = "🛑 Stop Gold Notifications",   CallbackData = "menu:stop_gold" }
+                            new TelegramMenuButton { Text = "🛑 Stop Silver Notifications", CallbackData = "menu:stop_silver" }
                         }
                     }
                 };

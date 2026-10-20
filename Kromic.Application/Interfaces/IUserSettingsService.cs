@@ -8,6 +8,8 @@ public interface IUserSettingsService
     Task SetTelegramNotificationsAsync(string chatId, bool enabled, CancellationToken cancellationToken);
     Task SetEmailNotificationsAsync(string chatId, bool enabled, CancellationToken cancellationToken);
     Task SetPausedAsync(string chatId, bool paused, CancellationToken cancellationToken);
+    Task SetGoldNotificationsAsync(string chatId, bool enabled, CancellationToken cancellationToken);
+    Task SetSilverNotificationsAsync(string chatId, bool enabled, CancellationToken cancellationToken);
     Task<bool> ShouldReceiveTelegramNotificationsAsync(string chatId, CancellationToken cancellationToken);
     Task<bool> ShouldReceiveEmailNotificationsAsync(string chatId, CancellationToken cancellationToken);
 }
@@ -18,4 +20,6 @@ public sealed class UserSettings
     public bool TelegramNotificationsEnabled { get; set; } = true;
     public bool EmailNotificationsEnabled { get; set; } = true;
     public bool IsPaused { get; set; } = false;
+    public bool GoldNotificationsEnabled { get; set; } = true;
+    public bool SilverNotificationsEnabled { get; set; } = true;
 }

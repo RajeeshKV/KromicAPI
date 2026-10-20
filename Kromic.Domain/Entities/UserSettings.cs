@@ -8,6 +8,8 @@ public sealed class UserSettings
     public bool TelegramNotificationsEnabled { get; set; } = true;
     public bool EmailNotificationsEnabled { get; set; } = true;
     public bool IsPaused { get; set; } = false;
+    public bool GoldNotificationsEnabled { get; set; } = true;
+    public bool SilverNotificationsEnabled { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

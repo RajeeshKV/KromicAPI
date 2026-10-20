@@ -21,13 +21,7 @@ public sealed class UserSettingsService(
             return null;
         }
 
-        return new Application.Interfaces.UserSettings
-        {
-            Language = entity.Language,
-            TelegramNotificationsEnabled = entity.TelegramNotificationsEnabled,
-            EmailNotificationsEnabled = entity.EmailNotificationsEnabled,
-            IsPaused = entity.IsPaused
-        };
+        return ToDto(entity);
     }
 
     public async Task<Application.Interfaces.UserSettings> GetOrCreateAsync(string chatId, CancellationToken cancellationToken)
@@ -45,6 +39,8 @@ public sealed class UserSettingsService(
             TelegramNotificationsEnabled = true,
             EmailNotificationsEnabled = true,
             IsPaused = false,
+            GoldNotificationsEnabled = true,
+            SilverNotificationsEnabled = true,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
@@ -54,129 +50,61 @@ public sealed class UserSettingsService(
 
         logger.LogInformation("Created default settings for chat ID: {ChatId}", chatId);
 
-        return new Application.Interfaces.UserSettings
-        {
-            Language = entity.Language,
-            TelegramNotificationsEnabled = entity.TelegramNotificationsEnabled,
-            EmailNotificationsEnabled = entity.EmailNotificationsEnabled,
-            IsPaused = entity.IsPaused
-        };
+        return ToDto(entity);
     }
 
     public async Task UpdateLanguageAsync(string chatId, string language, CancellationToken cancellationToken)
     {
-        var entity = await dbContext.UserSettings
-            .FirstOrDefaultAsync(x => x.ChatId == chatId, cancellationToken);
-
-        if (entity == null)
-        {
-            entity = new Domain.Entities.UserSettings
-            {
-                ChatId = chatId,
-                Language = language,
-                TelegramNotificationsEnabled = true,
-                EmailNotificationsEnabled = true,
-                IsPaused = false,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
-            dbContext.UserSettings.Add(entity);
-        }
-        else
-        {
-            entity.Language = language;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
-        }
-
+        var entity = await GetOrCreateEntityAsync(chatId, cancellationToken);
+        entity.Language = language;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Updated language to {Language} for chat ID: {ChatId}", language, chatId);
     }
 
     public async Task SetTelegramNotificationsAsync(string chatId, bool enabled, CancellationToken cancellationToken)
     {
-        var entity = await dbContext.UserSettings
-            .FirstOrDefaultAsync(x => x.ChatId == chatId, cancellationToken);
-
-        if (entity == null)
-        {
-            entity = new Domain.Entities.UserSettings
-            {
-                ChatId = chatId,
-                Language = "en",
-                TelegramNotificationsEnabled = enabled,
-                EmailNotificationsEnabled = true,
-                IsPaused = false,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
-            dbContext.UserSettings.Add(entity);
-        }
-        else
-        {
-            entity.TelegramNotificationsEnabled = enabled;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
-        }
-
+        var entity = await GetOrCreateEntityAsync(chatId, cancellationToken);
+        entity.TelegramNotificationsEnabled = enabled;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Set Telegram notifications to {Enabled} for chat ID: {ChatId}", enabled, chatId);
     }
 
     public async Task SetEmailNotificationsAsync(string chatId, bool enabled, CancellationToken cancellationToken)
     {
-        var entity = await dbContext.UserSettings
-            .FirstOrDefaultAsync(x => x.ChatId == chatId, cancellationToken);
-
-        if (entity == null)
-        {
-            entity = new Domain.Entities.UserSettings
-            {
-                ChatId = chatId,
-                Language = "en",
-                TelegramNotificationsEnabled = true,
-                EmailNotificationsEnabled = enabled,
-                IsPaused = false,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
-            dbContext.UserSettings.Add(entity);
-        }
-        else
-        {
-            entity.EmailNotificationsEnabled = enabled;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
-        }
-
+        var entity = await GetOrCreateEntityAsync(chatId, cancellationToken);
+        entity.EmailNotificationsEnabled = enabled;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Set email notifications to {Enabled} for chat ID: {ChatId}", enabled, chatId);
     }
 
     public async Task SetPausedAsync(string chatId, bool paused, CancellationToken cancellationToken)
     {
-        var entity = await dbContext.UserSettings
-            .FirstOrDefaultAsync(x => x.ChatId == chatId, cancellationToken);
-
-        if (entity == null)
-        {
-            entity = new Domain.Entities.UserSettings
-            {
-                ChatId = chatId,
-                Language = "en",
-                TelegramNotificationsEnabled = true,
-                EmailNotificationsEnabled = true,
-                IsPaused = paused,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
-            dbContext.UserSettings.Add(entity);
-        }
-        else
-        {
-            entity.IsPaused = paused;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
-        }
-
+        var entity = await GetOrCreateEntityAsync(chatId, cancellationToken);
+        entity.IsPaused = paused;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Set paused state to {Paused} for chat ID: {ChatId}", paused, chatId);
+    }
+
+    public async Task SetGoldNotificationsAsync(string chatId, bool enabled, CancellationToken cancellationToken)
+    {
+        var entity = await GetOrCreateEntityAsync(chatId, cancellationToken);
+        entity.GoldNotificationsEnabled = enabled;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Set gold notifications to {Enabled} for chat ID: {ChatId}", enabled, chatId);
+    }
+
+    public async Task SetSilverNotificationsAsync(string chatId, bool enabled, CancellationToken cancellationToken)
+    {
+        var entity = await GetOrCreateEntityAsync(chatId, cancellationToken);
+        entity.SilverNotificationsEnabled = enabled;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Set silver notifications to {Enabled} for chat ID: {ChatId}", enabled, chatId);
     }
 
     public async Task<bool> ShouldReceiveTelegramNotificationsAsync(string chatId, CancellationToken cancellationToken)
@@ -200,4 +128,40 @@ public sealed class UserSettingsService(
 
         return settings.EmailNotificationsEnabled;
     }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private async Task<Domain.Entities.UserSettings> GetOrCreateEntityAsync(string chatId, CancellationToken cancellationToken)
+    {
+        var entity = await dbContext.UserSettings
+            .FirstOrDefaultAsync(x => x.ChatId == chatId, cancellationToken);
+
+        if (entity != null) return entity;
+
+        entity = new Domain.Entities.UserSettings
+        {
+            ChatId = chatId,
+            Language = "en",
+            TelegramNotificationsEnabled = true,
+            EmailNotificationsEnabled = true,
+            IsPaused = false,
+            GoldNotificationsEnabled = true,
+            SilverNotificationsEnabled = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        dbContext.UserSettings.Add(entity);
+        return entity;
+    }
+
+    private static Application.Interfaces.UserSettings ToDto(Domain.Entities.UserSettings entity) =>
+        new()
+        {
+            Language = entity.Language,
+            TelegramNotificationsEnabled = entity.TelegramNotificationsEnabled,
+            EmailNotificationsEnabled = entity.EmailNotificationsEnabled,
+            IsPaused = entity.IsPaused,
+            GoldNotificationsEnabled = entity.GoldNotificationsEnabled,
+            SilverNotificationsEnabled = entity.SilverNotificationsEnabled,
+        };
 }

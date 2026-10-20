@@ -907,20 +907,35 @@ public sealed class GoldRateService(
 
                 var userSettings = await userSettingsService.GetByChatIdAsync(chatId, cancellationToken);
                 var language = userSettings?.Language ?? "en";
+                var wantsGold   = userSettings?.GoldNotificationsEnabled   ?? true;
+                var wantsSilver = userSettings?.SilverNotificationsEnabled ?? true;
 
-                var stopMenu = new List<TelegramMenuRow>
+                var stopGoldMenu = new List<TelegramMenuRow>
                 {
                     new TelegramMenuRow
                     {
                         Buttons = new List<TelegramMenuButton>
                         {
-                            new TelegramMenuButton { Text = "🛑 Stop Notifications", CallbackData = "menu:stop" }
+                            new TelegramMenuButton { Text = "🛑 Stop Gold Notifications",   CallbackData = "menu:stop_gold" },
+                            new TelegramMenuButton { Text = "🛑 Stop Silver Notifications", CallbackData = "menu:stop_silver" }
                         }
                     }
                 };
 
-                // ── Gold message — only if gold changed ───────────────────────
-                if (goldChanged)
+                var stopSilverMenu = new List<TelegramMenuRow>
+                {
+                    new TelegramMenuRow
+                    {
+                        Buttons = new List<TelegramMenuButton>
+                        {
+                            new TelegramMenuButton { Text = "🛑 Stop Silver Notifications", CallbackData = "menu:stop_silver" },
+                            new TelegramMenuButton { Text = "🛑 Stop Gold Notifications",   CallbackData = "menu:stop_gold" }
+                        }
+                    }
+                };
+
+                // ── Gold message — only if gold changed and user wants gold ──────
+                if (goldChanged && wantsGold)
                 {
                     var goldTitle = isLowestAlert
                         ? localizationService.GetString("commands.lowest_gold_rate", language)
@@ -933,18 +948,18 @@ public sealed class GoldRateService(
                                       $"8g: Rs. {eightGramRate:N2}{rate8gChange}\n\n" +
                                       $"<i>{istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
 
-                    await telegramService.SendMessageWithMenuAsync(chatId, goldMessage, stopMenu, cancellationToken);
+                    await telegramService.SendMessageWithMenuAsync(chatId, goldMessage, stopGoldMenu, cancellationToken);
                 }
 
-                // ── Silver message — only if silver changed ───────────────────
-                if (silverChanged && snapshot.SilverRate.HasValue)
+                // ── Silver message — only if silver changed and user wants silver ─
+                if (silverChanged && snapshot.SilverRate.HasValue && wantsSilver)
                 {
                     var silverMessage = $"<b>🥈 Silver Rate</b>\n\n" +
                                         $"1g:  Rs. {snapshot.SilverRate.Value:N2}{silverChange}\n" +
                                         $"10g: Rs. {snapshot.SilverRate.Value * 10:N2}\n\n" +
                                         $"<i>{istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
 
-                    await telegramService.SendMessageToChatIdAsync(chatId, silverMessage, cancellationToken);
+                    await telegramService.SendMessageWithMenuAsync(chatId, silverMessage, stopSilverMenu, cancellationToken);
                 }
             }
             catch (Exception ex)

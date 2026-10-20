@@ -557,6 +557,56 @@ public sealed class TelegramWebhookController(
                 await StopAllNotificationsAsync(chatId, cancellationToken, language);
                 return;
 
+            case "stop_gold":
+                await userSettingsService.SetGoldNotificationsAsync(chatId, false, cancellationToken);
+                await telegramService.SendMessageWithMenuAsync(
+                    chatId,
+                    "🔕 Gold rate notifications stopped.\n\nYou can re-enable them any time from <b>Settings → Gold Notifications</b>.",
+                    await GetSettingsMenuAsync(chatId, language, cancellationToken),
+                    cancellationToken);
+                return;
+
+            case "stop_silver":
+                await userSettingsService.SetSilverNotificationsAsync(chatId, false, cancellationToken);
+                await telegramService.SendMessageWithMenuAsync(
+                    chatId,
+                    "🔕 Silver rate notifications stopped.\n\nYou can re-enable them any time from <b>Settings → Silver Notifications</b>.",
+                    await GetSettingsMenuAsync(chatId, language, cancellationToken),
+                    cancellationToken);
+                return;
+
+            case "toggle_gold":
+            {
+                var s = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
+                var newState = !s.GoldNotificationsEnabled;
+                await userSettingsService.SetGoldNotificationsAsync(chatId, newState, cancellationToken);
+                var statusText = newState
+                    ? (localizationService.GetString("commands.enabled", language) ?? "enabled")
+                    : (localizationService.GetString("commands.disabled", language) ?? "disabled");
+                await telegramService.SendMessageWithMenuAsync(
+                    chatId,
+                    $"📈 Gold notifications {statusText}.",
+                    await GetSettingsMenuAsync(chatId, language, cancellationToken),
+                    cancellationToken);
+                return;
+            }
+
+            case "toggle_silver":
+            {
+                var s = await userSettingsService.GetOrCreateAsync(chatId, cancellationToken);
+                var newState = !s.SilverNotificationsEnabled;
+                await userSettingsService.SetSilverNotificationsAsync(chatId, newState, cancellationToken);
+                var statusText = newState
+                    ? (localizationService.GetString("commands.enabled", language) ?? "enabled")
+                    : (localizationService.GetString("commands.disabled", language) ?? "disabled");
+                await telegramService.SendMessageWithMenuAsync(
+                    chatId,
+                    $"🥈 Silver notifications {statusText}.",
+                    await GetSettingsMenuAsync(chatId, language, cancellationToken),
+                    cancellationToken);
+                return;
+            }
+
             default:
                 message = localizationService.GetString("commands.menu_main", language);
                 menu = GetMainMenu(language);
@@ -754,9 +804,11 @@ public sealed class TelegramWebhookController(
         // Add current status to button text
         var telegramStatus = settings.TelegramNotificationsEnabled ? enabledText : disabledText;
         var emailStatus = settings.EmailNotificationsEnabled ? enabledText : disabledText;
-        
+        var goldStatus   = settings.GoldNotificationsEnabled   ? enabledText : disabledText;
+        var silverStatus = settings.SilverNotificationsEnabled ? enabledText : disabledText;
+
         var telegramButtonText = $"{telegramText}: {telegramStatus}";
-        var emailButtonText = $"{emailText}: {emailStatus}";
+        var emailButtonText    = $"{emailText}: {emailStatus}";
 
         logger.LogInformation("GetSettingsMenu - Language: {Language}, Telegram: {TelegramStatus}, Email: {EmailStatus}", language, telegramStatus, emailStatus);
 
@@ -767,6 +819,14 @@ public sealed class TelegramWebhookController(
                 Buttons = new List<TelegramMenuButton>
                 {
                     new TelegramMenuButton { Text = telegramButtonText, CallbackData = "menu:toggle_telegram" }
+                }
+            },
+            new TelegramMenuRow
+            {
+                Buttons = new List<TelegramMenuButton>
+                {
+                    new TelegramMenuButton { Text = $"📈 Gold: {goldStatus}",   CallbackData = "menu:toggle_gold" },
+                    new TelegramMenuButton { Text = $"🥈 Silver: {silverStatus}", CallbackData = "menu:toggle_silver" }
                 }
             },
             new TelegramMenuRow

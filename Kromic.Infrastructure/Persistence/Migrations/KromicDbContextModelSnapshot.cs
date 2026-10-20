@@ -549,6 +549,10 @@ namespace Kromic.Infrastructure.Persistence.Migrations
                     b.Property<bool>("EmailNotificationsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("GoldNotificationsEnabled")
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<bool>("IsPaused")
                         .HasColumnType("boolean");
 
@@ -556,6 +560,10 @@ namespace Kromic.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(5)
                         .HasColumnType("character varying(5)");
+
+                    b.Property<bool>("SilverNotificationsEnabled")
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<bool>("TelegramNotificationsEnabled")
                         .HasColumnType("boolean");

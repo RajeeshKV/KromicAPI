@@ -200,19 +200,14 @@ public sealed class GoldRateService(
             .OrderByDescending(x => x.FetchedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Skip if nothing changed (gold rate AND silver rate both identical to latest today)
+        // Skip if gold rate unchanged (silver is tracked separately)
         if (latestToday is not null && latestToday.R22KT == data.R22KT)
         {
-            var silverUnchanged = latestToday.SilverRate == data.SilverRate;
-            if (silverUnchanged)
-            {
-                logger.LogInformation(
-                    "Gold and silver rates unchanged for {Date}. 22K: {GoldRate}, Silver: {SilverRate}. Skipping save and notifications.",
-                    TimeZoneInfo.ConvertTime(fetchedAt, GetIndiaTimeZone()).Date,
-                    data.R22KT,
-                    data.SilverRate);
-                return new GoldRateFetchResponse(ToResponse(latestToday), RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
-            }
+            logger.LogInformation(
+                "Gold rate unchanged for {Date}. 22K: {GoldRate}. Skipping save and notifications.",
+                TimeZoneInfo.ConvertTime(fetchedAt, GetIndiaTimeZone()).Date,
+                data.R22KT);
+            return new GoldRateFetchResponse(ToResponse(latestToday), RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
         }
 
         var previousLowest = await dbContext.GoldRateSnapshots
@@ -224,9 +219,7 @@ public sealed class GoldRateService(
         // and they differ. A null result (e.g. backup provider that has no silver data) is
         // treated as "no data" — never as a change that warrants a notification.
         var goldChanged = latestToday == null || latestToday.R22KT != data.R22KT;
-        var silverChanged = latestToday?.SilverRate.HasValue == true
-            && data.SilverRate.HasValue
-            && latestToday.SilverRate != data.SilverRate;
+        var silverChanged = false;
 
         var isLowest = previousLowest.HasValue && data.R22KT < previousLowest.Value;
         var snapshot = new GoldRateSnapshot
@@ -236,7 +229,6 @@ public sealed class GoldRateService(
             R22KTShow = data.R22KTShow,
             R18KT = data.R18KT,
             R24KT = data.R24KT,
-            SilverRate = data.SilverRate,
             SourceLastUpdatedAt = ParseIndiaDateTime(data.LastUpdated),
             FetchedAt = fetchedAt,
             IsLowestAtFetch = isLowest
@@ -245,8 +237,11 @@ public sealed class GoldRateService(
         dbContext.GoldRateSnapshots.Add(snapshot);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // Sync any new Telegram users from configured environment
-        await SyncConfiguredTelegramUsersAsync(cancellationToken);
+        // Store silver separately (decoupled) when present
+        if (data.SilverRate.HasValue)
+        {
+            silverChanged = await StoreSilverRateAsync(data, cancellationToken);
+        }
 
         // Email: only when gold changed
         if (sendRegularEmail && goldChanged)
@@ -270,6 +265,32 @@ public sealed class GoldRateService(
 
         return new GoldRateFetchResponse(ToResponse(snapshot), sendRegularEmail && goldChanged, sendLowestAlert && isLowest, RateChanged: goldChanged || silverChanged);
     }
+    private async Task<bool> StoreSilverRateAsync(GoldRateApiData data, CancellationToken cancellationToken)
+    {
+        var fetchedAt = DateTimeOffset.UtcNow;
+        var todayRange = GetIndiaDayRange(fetchedAt);
+        var latestToday = await dbContext.SilverRateSnapshots
+            .Where(x => x.FetchedAt >= todayRange.StartUtc && x.FetchedAt < todayRange.EndUtc)
+            .OrderByDescending(x => x.FetchedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (latestToday is not null && latestToday.SilverRate == data.SilverRate.Value)
+        {
+            return false;
+        }
+
+        var snapshot = new SilverRateSnapshot
+        {
+            SourceId = data.Id,
+            SilverRate = data.SilverRate.Value,
+            SourceLastUpdatedAt = ParseIndiaDateTime(data.LastUpdated),
+            FetchedAt = fetchedAt
+        };
+        dbContext.SilverRateSnapshots.Add(snapshot);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private async Task<GoldRateApiResponse?> FetchLatestGoldRateAsync(CancellationToken cancellationToken)
     {
         if (IsAkgsmaEndpoint(_options.Endpoint))
@@ -627,12 +648,10 @@ public sealed class GoldRateService(
 
     public async Task<decimal?> GetCurrentSilverRateAsync(CancellationToken cancellationToken)
     {
-        var snapshot = await dbContext.GoldRateSnapshots
+        var snapshot = await dbContext.SilverRateSnapshots
             .AsNoTracking()
-            .Where(x => x.SilverRate != null)
             .OrderByDescending(x => x.FetchedAt)
             .FirstOrDefaultAsync(cancellationToken);
-
         return snapshot?.SilverRate;
     }
 
@@ -641,9 +660,7 @@ public sealed class GoldRateService(
         DateTimeOffset? to,
         CancellationToken cancellationToken)
     {
-        var query = dbContext.GoldRateSnapshots
-            .AsNoTracking()
-            .Where(x => x.SilverRate != null);
+        var query = dbContext.SilverRateSnapshots.AsNoTracking();
 
         if (from.HasValue)
             query = query.Where(x => x.FetchedAt >= from.Value.ToUniversalTime());
@@ -655,7 +672,7 @@ public sealed class GoldRateService(
             .OrderByDescending(x => x.FetchedAt)
             .ToListAsync(cancellationToken);
 
-        return items.Select(ToResponse).ToList();
+        return items.Select(x => new GoldRateSnapshotResponse(x.Id, 0, true, null, null, x.SilverRate, x.SourceLastUpdatedAt, x.FetchedAt, false, x.RegularEmailMessageId, x.LowestAlertMessageId)).ToList();
     }
 
     public async Task<GoldRateHistoryResponse> GetHistoryAsync(
@@ -863,11 +880,23 @@ public sealed class GoldRateService(
                 : " (➡️ 0.00)";
         }
 
+        var currentSilverRate = await dbContext.SilverRateSnapshots
+            .AsNoTracking()
+            .OrderByDescending(x => x.FetchedAt)
+            .Select(x => (decimal?)x.SilverRate)
+            .FirstOrDefaultAsync(cancellationToken);
+        var previousSilverRate = await dbContext.SilverRateSnapshots
+            .AsNoTracking()
+            .Where(x => x.FetchedAt < snapshot.FetchedAt)
+            .OrderByDescending(x => x.FetchedAt)
+            .Select(x => (decimal?)x.SilverRate)
+            .FirstOrDefaultAsync(cancellationToken);
+
         // Silver change vs previous snapshot
         var silverChange = string.Empty;
-        if (snapshot.SilverRate.HasValue && previousSnapshot?.SilverRate.HasValue == true)
+        if (currentSilverRate.HasValue && previousSilverRate.HasValue)
         {
-            var silverDiff = snapshot.SilverRate.Value - previousSnapshot.SilverRate.Value;
+            var silverDiff = currentSilverRate.Value - previousSilverRate.Value;
             var silverEmoji = silverDiff > 0 ? "🔺" : silverDiff < 0 ? "🔻" : "➡️";
             silverChange = silverDiff != 0
                 ? $" ({silverEmoji} {Math.Abs(silverDiff):N2})"
@@ -953,11 +982,11 @@ public sealed class GoldRateService(
                 }
 
                 // ── Silver message — only if silver changed and user wants silver ─
-                if (silverChanged && snapshot.SilverRate.HasValue && wantsSilver)
+                if (silverChanged && currentSilverRate.HasValue && wantsSilver)
                 {
                     var silverMessage = $"<b>🥈 Silver Rate</b>\n\n" +
-                                        $"1g:  Rs. {snapshot.SilverRate.Value:N2}{silverChange}\n" +
-                                        $"10g: Rs. {snapshot.SilverRate.Value * 10:N2}\n\n" +
+                                        $"1g:  Rs. {currentSilverRate.Value:N2}{silverChange}\n" +
+                                        $"10g: Rs. {currentSilverRate.Value * 10:N2}\n\n" +
                                         $"<i>{istFetchedAt:dd MMM yyyy, hh:mm tt} IST</i>";
 
                     await telegramService.SendMessageWithMenuAsync(chatId, silverMessage, stopSilverMenu, cancellationToken);
@@ -1089,7 +1118,7 @@ public sealed class GoldRateService(
             snapshot.R22KTShow,
             snapshot.R18KT,
             snapshot.R24KT,
-            snapshot.SilverRate,
+            null,
             snapshot.SourceLastUpdatedAt,
             snapshot.FetchedAt,
             snapshot.IsLowestAtFetch,

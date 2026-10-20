@@ -14,6 +14,7 @@ public sealed class KromicDbContext(DbContextOptions<KromicDbContext> options) :
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
     public DbSet<ContactSubmission> ContactSubmissions => Set<ContactSubmission>();
     public DbSet<GoldRateSnapshot> GoldRateSnapshots => Set<GoldRateSnapshot>();
+    public DbSet<SilverRateSnapshot> SilverRateSnapshots => Set<SilverRateSnapshot>();
     public DbSet<GoldRateEmailSubscription> GoldRateEmailSubscriptions => Set<GoldRateEmailSubscription>();
     public DbSet<TelegramUser> TelegramUsers => Set<TelegramUser>();
     public DbSet<UserSettings> UserSettings => Set<UserSettings>();
@@ -77,6 +78,15 @@ public sealed class KromicDbContext(DbContextOptions<KromicDbContext> options) :
             entity.Property(x => x.R22KT).HasPrecision(18, 2);
             entity.Property(x => x.R18KT).HasPrecision(18, 2);
             entity.Property(x => x.R24KT).HasPrecision(18, 2);
+            entity.Property(x => x.RegularEmailMessageId).HasMaxLength(200);
+            entity.Property(x => x.LowestAlertMessageId).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<SilverRateSnapshot>(entity =>
+        {
+            entity.HasIndex(x => x.FetchedAt);
+            entity.HasIndex(x => x.SilverRate);
+            entity.Property(x => x.SilverRate).HasPrecision(18, 2);
             entity.Property(x => x.RegularEmailMessageId).HasMaxLength(200);
             entity.Property(x => x.LowestAlertMessageId).HasMaxLength(200);
         });

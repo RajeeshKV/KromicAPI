@@ -469,6 +469,42 @@ namespace Kromic.Infrastructure.Persistence.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("Kromic.Domain.Entities.SilverRateSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("FetchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LowestAlertMessageId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("RegularEmailMessageId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal>("SilverRate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("SourceId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("SourceLastUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FetchedAt");
+
+                    b.HasIndex("SilverRate");
+
+                    b.ToTable("SilverRateSnapshots");
+                });
+
             modelBuilder.Entity("Kromic.Domain.Entities.TelegramUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -550,8 +586,7 @@ namespace Kromic.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("GoldNotificationsEnabled")
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsPaused")
                         .HasColumnType("boolean");
@@ -562,8 +597,7 @@ namespace Kromic.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(5)");
 
                     b.Property<bool>("SilverNotificationsEnabled")
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("TelegramNotificationsEnabled")
                         .HasColumnType("boolean");

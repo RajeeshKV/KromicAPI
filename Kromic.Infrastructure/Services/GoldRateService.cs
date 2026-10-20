@@ -178,6 +178,11 @@ public sealed class GoldRateService(
             return await FetchGoodReturnsKeralaGoldRateAsync(cancellationToken);
         }
 
+        if (provider.Contains("onearabia.me", StringComparison.OrdinalIgnoreCase))
+        {
+            return await FetchOneArabiaKeralaGoldRateAsync(cancellationToken);
+        }
+
         // Extensibility point: add additional backup provider fetchers here
         throw new NotSupportedException($"Backup provider '{provider}' is not supported.");
     }
@@ -443,6 +448,76 @@ public sealed class GoldRateService(
         };
 
         return GoldRateApiResponse.FromData("goodreturns.in rate parsed successfully.", data);
+    }
+
+    private async Task<GoldRateApiResponse?> FetchOneArabiaKeralaGoldRateAsync(CancellationToken cancellationToken)
+    {
+        // onearabia.me is fully server-side rendered — the Kerala 22K rate is in the
+        // static HTML, no JS execution required.
+        // HTML structure of the 1-gram rate table row:
+        //   <tr role="row"> <td role="cell">22K</td> <td role="cell">13490</td> ... </tr>
+        const string url = "https://www.onearabia.me/gold-rates-kerala/";
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.TryAddWithoutValidation("User-Agent",     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36");
+        request.Headers.TryAddWithoutValidation("Accept",         "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        request.Headers.TryAddWithoutValidation("Accept-Language","en-US,en;q=0.9");
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var html = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"onearabia.me Kerala gold rate page failed with {(int)response.StatusCode} {response.ReasonPhrase}.");
+        }
+
+        return ParseOneArabiaHtml(html);
+    }
+
+    private static GoldRateApiResponse ParseOneArabiaHtml(string html)
+    {
+        // Match the 1-gram 22K row: <td>22K</td> <td>13490</td>
+        // The 10-gram row has the same structure but value is 10x larger (e.g. 134900),
+        // so we anchor on a value that is plausibly per-gram (4–6 digits, < 100000).
+        var rateMatch = Regex.Match(
+            html,
+            @"<td[^>]*>\s*22K\s*</td>\s*<td[^>]*>\s*(?<rate>\d{4,6})\s*</td>",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        if (!rateMatch.Success)
+        {
+            throw new InvalidOperationException("onearabia.me page did not contain a parseable 22K gold rate row.");
+        }
+
+        var rateText = rateMatch.Groups["rate"].Value;
+        if (!decimal.TryParse(rateText, NumberStyles.Number, CultureInfo.InvariantCulture, out var r22Kt))
+        {
+            throw new InvalidOperationException($"onearabia.me 22K rate could not be parsed: '{rateText}'");
+        }
+
+        // Extract date — page shows "20 Oct, 2026" near the top
+        string? parsedDate = null;
+        var dateMatch = Regex.Match(
+            html,
+            @"(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*[\s,]+\d{4})",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (dateMatch.Success &&
+            DateTime.TryParse(dateMatch.Groups[1].Value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDt))
+        {
+            parsedDate = parsedDt.ToString("dd/MM/yyyy");
+        }
+
+        var data = new GoldRateApiData
+        {
+            Id = 0,
+            R22KT = r22Kt,
+            R22KTShow = true,
+            SilverRate = null, // onearabia.me is gold-only
+            LastUpdated = parsedDate
+        };
+
+        return GoldRateApiResponse.FromData("onearabia.me rate parsed successfully.", data);
     }
 
     private async Task<GoldRateApiResponse?> FetchJsonGoldRateAsync(CancellationToken cancellationToken)

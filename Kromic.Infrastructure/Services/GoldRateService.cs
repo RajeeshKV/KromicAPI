@@ -285,157 +285,152 @@ public sealed class GoldRateService(
 
     private async Task<GoldRateApiResponse?> FetchAkgsmaGoldRateAsync(CancellationToken cancellationToken)
     {
-        // Litespeed bot protection sets a session cookie on first visit.
-        // We do a warm-up GET first so the cookie jar is seeded, then
-        // the real request carries that cookie and passes the bot check.
-        var browserHeaders = new (string Name, string Value)[]
-        {
-            ("User-Agent",               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"),
-            ("Accept",                   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"),
-            ("Accept-Language",          "en-US,en;q=0.9"),
-            ("Connection",               "keep-alive"),
-            ("Upgrade-Insecure-Requests","1"),
-            ("Cache-Control",            "no-cache"),
-            ("Sec-Fetch-Dest",           "document"),
-            ("Sec-Fetch-Mode",           "navigate"),
-            ("Sec-Fetch-Site",           "none"),
-            ("Sec-Fetch-User",           "?1"),
-        };
-
-        // --- Warm-up request (seeds cookies) ---
-        try
-        {
-            using var warmup = new HttpRequestMessage(HttpMethod.Get, _options.Endpoint);
-            foreach (var (name, value) in browserHeaders)
-                warmup.Headers.TryAddWithoutValidation(name, value);
-
-            using var warmupResponse = await httpClient.SendAsync(warmup, HttpCompletionOption.ResponseContentRead, cancellationToken);
-            // Drain the body so the connection is cleanly completed and cookies are committed
-            await warmupResponse.Content.ReadAsStringAsync(cancellationToken);
-            logger.LogDebug("AKGSMA warm-up responded with {Status}", (int)warmupResponse.StatusCode);
-
-            // Wait for cookie to be fully set before the real request
-            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "AKGSMA warm-up request failed; proceeding anyway.");
-        }
-
-        // --- Real request (carries cookies from warm-up) ---
+        // akgsma.com is currently protected by Google reCAPTCHA (not the cookie-based
+        // LiteSpeed bot check we previously bypassed with a warm-up request).
+        // A single fast probe lets us detect the block without wasting time.
         using var request = new HttpRequestMessage(HttpMethod.Get, _options.Endpoint);
-        foreach (var (name, value) in browserHeaders)
-            request.Headers.TryAddWithoutValidation(name, value);
+        request.Headers.TryAddWithoutValidation("User-Agent",  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36");
+        request.Headers.TryAddWithoutValidation("Accept",      "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        request.Headers.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");
 
-        // Referer makes it look like we navigated from the same site
-        request.Headers.TryAddWithoutValidation("Referer", _options.Endpoint);
-        request.Headers.TryAddWithoutValidation("Cache-Control", "max-age=0");
-
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        var html = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
+            // Drain a small portion of the body for the log message, then bail fast.
+            var snippet = string.Empty;
+            try
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(TimeSpan.FromSeconds(2));
+                var body = await response.Content.ReadAsStringAsync(cts.Token);
+                snippet = body.Length > 200 ? body[..200] : body;
+            }
+            catch { /* best-effort */ }
+
             throw new InvalidOperationException(
-                $"AKGSMA gold rate page failed with {(int)response.StatusCode} {response.ReasonPhrase}. Response: {html}");
+                $"AKGSMA gold rate page failed with {(int)response.StatusCode} {response.ReasonPhrase}. Snippet: {snippet}");
         }
 
+        var html = await response.Content.ReadAsStringAsync(cancellationToken);
         return ParseAkgsmaHtml(html);
     }
 
     private async Task<GoldRateApiResponse?> FetchGoodReturnsKeralaGoldRateAsync(CancellationToken cancellationToken)
     {
-        const string goldUrl = "https://www.goodreturns.in/gold-rates/kerala.html";
-        const string silverUrl = "https://www.goodreturns.in/silver-rates/kerala.html";
+        // goodreturns.in serves prices via client-side JS; the underlying AJAX endpoint
+        // returns JSON when called with the X-Requested-With / X-OIGT-Header headers.
+        // Format: GET /gold-rates/kerala.html?gr_db_dynamic_content=metal_past_price&date=YYYY-MM-DD
+        // Response: { "current_date": "20 October 2026", "gold_price_22K": "₹13,490", ... }
 
-        using var goldRequest = new HttpRequestMessage(HttpMethod.Get, goldUrl);
-        goldRequest.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36");
-        goldRequest.Headers.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-        goldRequest.Headers.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");
+        var indiaToday = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, GetIndiaTimeZone()).Date;
+        var dateParam = indiaToday.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        const string goldBase = "https://www.goodreturns.in/gold-rates/kerala.html";
+        const string silverBase = "https://www.goodreturns.in/silver-rates/kerala.html";
+
+        var ajaxHeaders = new (string Name, string Value)[]
+        {
+            ("User-Agent",        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"),
+            ("X-Requested-With", "XMLHttpRequest"),
+            ("X-OIGT-Header",    "GITPL"),
+            ("Accept",           "application/json, text/javascript, */*; q=0.01"),
+        };
+
+        using var goldRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"{goldBase}?gr_db_dynamic_content=metal_past_price&date={dateParam}");
+        goldRequest.Headers.TryAddWithoutValidation("Referer", goldBase);
+        foreach (var (name, value) in ajaxHeaders)
+            goldRequest.Headers.TryAddWithoutValidation(name, value);
 
         using var goldResponse = await httpClient.SendAsync(goldRequest, cancellationToken);
-        var goldHtml = await goldResponse.Content.ReadAsStringAsync(cancellationToken);
+        var goldJson = await goldResponse.Content.ReadAsStringAsync(cancellationToken);
 
         if (!goldResponse.IsSuccessStatusCode)
         {
             throw new InvalidOperationException(
-                $"goodreturns.in Kerala gold rate page failed with {(int)goldResponse.StatusCode} {goldResponse.ReasonPhrase}.");
+                $"goodreturns.in Kerala gold AJAX failed with {(int)goldResponse.StatusCode} {goldResponse.ReasonPhrase}. Body: {goldJson}");
         }
 
         // Fetch silver separately — best effort, don't fail gold if silver fails
         decimal? silverRate = null;
         try
         {
-            using var silverRequest = new HttpRequestMessage(HttpMethod.Get, silverUrl);
-            silverRequest.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36");
-            silverRequest.Headers.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-            silverRequest.Headers.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");
+            using var silverRequest = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"{silverBase}?gr_db_dynamic_content=metal_past_price&date={dateParam}");
+            silverRequest.Headers.TryAddWithoutValidation("Referer", silverBase);
+            foreach (var (name, value) in ajaxHeaders)
+                silverRequest.Headers.TryAddWithoutValidation(name, value);
 
             using var silverResponse = await httpClient.SendAsync(silverRequest, cancellationToken);
             if (silverResponse.IsSuccessStatusCode)
             {
-                var silverHtml = await silverResponse.Content.ReadAsStringAsync(cancellationToken);
-                silverRate = ParseGoodReturnsSilverRate(silverHtml);
-                logger.LogInformation("Fetched silver rate from goodreturns.in: {SilverRate}", silverRate);
+                var silverJson = await silverResponse.Content.ReadAsStringAsync(cancellationToken);
+                silverRate = ParseGoodReturnsSilverJson(silverJson);
             }
+            logger.LogInformation("Fetched silver rate from goodreturns.in: {SilverRate}", silverRate);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to fetch silver rate from goodreturns.in — gold fetch will proceed without silver.");
         }
 
-        return ParseGoodReturnsHtml(goldHtml, silverRate);
+        return ParseGoodReturnsGoldJson(goldJson, silverRate);
     }
 
-    private static decimal? ParseGoodReturnsSilverRate(string html)
+    private static decimal? ParseGoodReturnsSilverJson(string json)
     {
-        // Matches: Silver /g ₹250
-        var match = Regex.Match(
-            html,
-            @"Silver\s*/g[\s\S]*?₹\s*([\d,]+(?:\.\d+)?)",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        // Response: { "silver_price_1G": "₹240", "silver_price_1KG": "₹2,40,000", ... }
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("silver_price_1G", out var prop))
+            return null;
 
-        if (!match.Success) return null;
+        var raw = prop.GetString();
+        if (string.IsNullOrWhiteSpace(raw)) return null;
 
-        var text = match.Groups[1].Value.Replace(",", string.Empty);
-        return decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var rate)
+        // Strip currency symbol and commas: "₹240" → "240"
+        var text = Regex.Replace(raw, @"[^\d.]", string.Empty);
+        return decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var rate) && rate > 0
             ? rate
             : null;
     }
 
-    private static GoldRateApiResponse ParseGoodReturnsHtml(string html, decimal? silverRate = null)
+    private static GoldRateApiResponse ParseGoodReturnsGoldJson(string json, decimal? silverRate = null)
     {
-        // Matches: 22K Gold /g ... ₹14,065
-        var rateMatch = Regex.Match(
-            html,
-            @"22K\s+Gold\s*/g[\s\S]*?₹\s*([\d,]+(?:\.\d+)?)",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        // Response: { "current_date": "20 October 2026", "gold_price_22K": "₹13,490", ... }
+        using var doc = JsonDocument.Parse(json);
 
-        if (!rateMatch.Success)
+        if (!doc.RootElement.TryGetProperty("gold_price_22K", out var rateProp))
         {
-            throw new InvalidOperationException("goodreturns.in page did not contain a parseable 22K gold rate.");
+            throw new InvalidOperationException(
+                $"goodreturns.in AJAX response did not contain 'gold_price_22K'. Response: {json}");
         }
 
-        var rateText = rateMatch.Groups[1].Value.Replace(",", string.Empty);
+        var rawRate = rateProp.GetString();
+        if (string.IsNullOrWhiteSpace(rawRate))
+        {
+            throw new InvalidOperationException("goodreturns.in 'gold_price_22K' value was empty.");
+        }
+
+        // Strip currency symbol and commas: "₹13,490" → "13490"
+        var rateText = Regex.Replace(rawRate, @"[^\d.]", string.Empty);
         if (!decimal.TryParse(rateText, NumberStyles.Number, CultureInfo.InvariantCulture, out var r22Kt))
         {
-            throw new InvalidOperationException($"goodreturns.in 22K rate could not be parsed: {rateText}");
+            throw new InvalidOperationException($"goodreturns.in 22K rate could not be parsed: '{rawRate}'");
         }
 
-        // Try to extract the date from the page title e.g. "16 September 2026"
-        var dateMatch = Regex.Match(
-            html,
-            @"(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-
-        string? dateString = dateMatch.Success ? dateMatch.Groups[1].Value : null;
-
-        // Convert "16 September 2026" → "16/09/2026" for ParseIndiaDateTime compatibility
+        // Parse date "20 October 2026" → "20/10/2026" for ParseIndiaDateTime compatibility
         string? parsedDate = null;
-        if (dateString is not null &&
-            DateTime.TryParse(dateString, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDt))
+        if (doc.RootElement.TryGetProperty("current_date", out var dateProp))
         {
-            parsedDate = parsedDt.ToString("dd/MM/yyyy");
+            var dateString = dateProp.GetString();
+            if (dateString is not null &&
+                DateTime.TryParse(dateString, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDt))
+            {
+                parsedDate = parsedDt.ToString("dd/MM/yyyy");
+            }
         }
 
         var data = new GoldRateApiData

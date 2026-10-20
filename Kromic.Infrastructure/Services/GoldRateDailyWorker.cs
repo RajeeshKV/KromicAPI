@@ -76,23 +76,10 @@ public sealed class GoldRateDailyWorker(
                 var goldRateService = scope.ServiceProvider.GetRequiredService<IGoldRateService>();
                 if (nextRun.IsFailover)
                 {
-                    // Only run the failover if no snapshot has been saved today yet.
-                    // The failover trigger fires at 09:30 IST every loop iteration once
-                    // past that time — without this guard it would hammer backup providers
-                    // all day and cause oscillating notifications whenever providers
-                    // return slightly different rates.
-                    var hasSnapshot = await goldRateService.HasSnapshotForTodayAsync(stoppingToken);
-                    if (!hasSnapshot)
-                    {
-                        await goldRateService.FetchFromBackupProvidersAsync(
-                            sendRegularEmail: true,
-                            sendLowestAlert: true,
-                            stoppingToken);
-                    }
-                    else
-                    {
-                        logger.LogDebug("Failover skipped — today's snapshot already exists.");
-                    }
+                    await goldRateService.FetchFromBackupProvidersAsync(
+                        sendRegularEmail: true,
+                        sendLowestAlert: true,
+                        stoppingToken);
                 }
                 else if (nextRun.IsAkgsmaPreMarket)
                 {

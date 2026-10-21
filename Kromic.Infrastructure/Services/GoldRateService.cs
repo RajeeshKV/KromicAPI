@@ -10,6 +10,7 @@ using Kromic.Domain.Entities;
 using Kromic.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace Kromic.Infrastructure.Services;
@@ -24,8 +25,10 @@ public sealed class GoldRateService(
     IUserSettingsService userSettingsService,
     ILocalizationService localizationService,
     IOptions<GoldRateOptions> options,
+    IMemoryCache memoryCache,
     ILogger<GoldRateService> logger) : IGoldRateService
 {
+    private readonly IMemoryCache _memoryCache = memoryCache;
     private static readonly TimeSpan IndiaOffset = TimeSpan.FromHours(5.5);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -236,6 +239,7 @@ public sealed class GoldRateService(
 
         dbContext.GoldRateSnapshots.Add(snapshot);
         await dbContext.SaveChangesAsync(cancellationToken);
+        _memoryCache.Remove("gold:current");
 
         // Store silver separately (decoupled) when present
         if (data.SilverRate.HasValue)
@@ -288,6 +292,7 @@ public sealed class GoldRateService(
         };
         dbContext.SilverRateSnapshots.Add(snapshot);
         await dbContext.SaveChangesAsync(cancellationToken);
+        _memoryCache.Remove("silver:current");
         return true;
     }
 
@@ -638,21 +643,40 @@ public sealed class GoldRateService(
     }
     public async Task<GoldRateSnapshotResponse?> GetCurrentAsync(CancellationToken cancellationToken)
     {
+        const string key = "gold:current";
+        if (_memoryCache.TryGetValue<GoldRateSnapshotResponse>(key, out var cached))
+        {
+            return cached;
+        }
         var snapshot = await dbContext.GoldRateSnapshots
             .AsNoTracking()
             .OrderByDescending(x => x.FetchedAt)
             .FirstOrDefaultAsync(cancellationToken);
-
-        return snapshot is null ? null : ToResponse(snapshot);
+        var result = snapshot is null ? null : ToResponse(snapshot);
+        if (result is not null)
+        {
+            _memoryCache.Set(key, result, TimeSpan.FromHours(1));
+        }
+        return result;
     }
 
     public async Task<decimal?> GetCurrentSilverRateAsync(CancellationToken cancellationToken)
     {
+        const string key = "silver:current";
+        if (_memoryCache.TryGetValue<decimal?>(key, out var cached))
+        {
+            return cached;
+        }
         var snapshot = await dbContext.SilverRateSnapshots
             .AsNoTracking()
             .OrderByDescending(x => x.FetchedAt)
             .FirstOrDefaultAsync(cancellationToken);
-        return snapshot?.SilverRate;
+        var result = snapshot?.SilverRate;
+        if (result.HasValue)
+        {
+            _memoryCache.Set(key, result, TimeSpan.FromHours(1));
+        }
+        return result;
     }
 
     public async Task<IReadOnlyList<GoldRateSnapshotResponse>> GetSilverHistoryAsync(

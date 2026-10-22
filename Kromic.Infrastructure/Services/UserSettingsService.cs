@@ -26,12 +26,12 @@ public sealed class UserSettingsService(
 
         if (entity == null)
         {
-            _memoryCache.Set(key, (Application.Interfaces.UserSettings?)null, TimeSpan.MaxValue);
+            _memoryCache.Set(key, (Application.Interfaces.UserSettings?)null);
             return null;
         }
 
         var dto = ToDto(entity);
-        _memoryCache.Set(key, dto, TimeSpan.MaxValue);
+        _memoryCache.Set(key, dto);
         return dto;
     }
 

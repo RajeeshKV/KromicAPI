@@ -217,7 +217,7 @@ public sealed class GoldRateService(
                 "Gold rate unchanged for {Date}. 22K: {GoldRate}. Skipping save and notifications.",
                 TimeZoneInfo.ConvertTime(fetchedAt, GetIndiaTimeZone()).Date,
                 data.R22KT);
-            _memoryCache.Set("gold:current", ToResponse(latestToday), TimeSpan.MaxValue);
+            _memoryCache.Set("gold:current", ToResponse(latestToday));
             return new GoldRateFetchResponse(ToResponse(latestToday), RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
         }
 
@@ -247,7 +247,7 @@ public sealed class GoldRateService(
 
         dbContext.GoldRateSnapshots.Add(snapshot);
         await dbContext.SaveChangesAsync(cancellationToken);
-        _memoryCache.Set("gold:current", ToResponse(snapshot), TimeSpan.MaxValue);
+        _memoryCache.Set("gold:current", ToResponse(snapshot));
 
         // Store silver separately (decoupled) when present
         if (data.SilverRate.HasValue)
@@ -295,7 +295,7 @@ public sealed class GoldRateService(
 
         if (latestToday is not null && latestToday.SilverRate == data.SilverRate.Value)
         {
-            _memoryCache.Set("silver:current", latestToday.SilverRate, TimeSpan.MaxValue);
+            _memoryCache.Set("silver:current", latestToday.SilverRate);
             return false;
         }
 
@@ -308,7 +308,7 @@ public sealed class GoldRateService(
         };
         dbContext.SilverRateSnapshots.Add(snapshot);
         await dbContext.SaveChangesAsync(cancellationToken);
-        _memoryCache.Set("silver:current", snapshot.SilverRate, TimeSpan.MaxValue);
+        _memoryCache.Set("silver:current", snapshot.SilverRate);
         return true;
     }
 
@@ -671,7 +671,7 @@ public sealed class GoldRateService(
         var result = snapshot is null ? null : ToResponse(snapshot);
         if (result is not null)
         {
-            _memoryCache.Set(key, result, TimeSpan.MaxValue);
+            _memoryCache.Set(key, result);
         }
         return result;
     }
@@ -690,7 +690,7 @@ public sealed class GoldRateService(
         var result = snapshot?.SilverRate;
         if (result.HasValue)
         {
-            _memoryCache.Set(key, result, TimeSpan.MaxValue);
+            _memoryCache.Set(key, result);
         }
         return result;
     }

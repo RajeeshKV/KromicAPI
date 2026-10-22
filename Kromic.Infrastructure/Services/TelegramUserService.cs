@@ -24,7 +24,7 @@ public sealed class TelegramUserService(
         var entity = await dbContext.TelegramUsers
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.ChatId == chatId, cancellationToken);
-        _memoryCache.Set(key, entity, TimeSpan.MaxValue);
+        _memoryCache.Set(key, entity);
         return entity;
     }
 

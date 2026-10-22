@@ -4,6 +4,7 @@ using Kromic.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Kromic.Infrastructure.Services;
 
@@ -12,19 +13,21 @@ public sealed class LocalizationService : ILocalizationService
     private readonly Dictionary<string, Dictionary<string, string>> _resources = new();
     private readonly string _resourcesPath;
     private readonly ILogger<LocalizationService> _logger;
-    private readonly KromicDbContext? _dbContext;
     private readonly bool _useDatabase;
+    private readonly IServiceProvider _serviceProvider;
 
-    public LocalizationService(IHostEnvironment environment, ILogger<LocalizationService> logger, KromicDbContext? dbContext = null)
+    public LocalizationService(IHostEnvironment environment, ILogger<LocalizationService> logger, IServiceProvider serviceProvider)
     {
         _logger = logger;
-        _dbContext = dbContext;
+        _serviceProvider = serviceProvider;
         _resourcesPath = Path.Combine(environment.ContentRootPath, "Resources");
+        using var scope = _serviceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetService<KromicDbContext>();
         _useDatabase = dbContext != null;
-        
+
         if (_useDatabase)
         {
-            LoadResourcesFromDatabase();
+            LoadResourcesFromDatabase(dbContext!);
         }
         else
         {
@@ -75,18 +78,18 @@ public sealed class LocalizationService : ILocalizationService
         }
     }
 
-    private void LoadResourcesFromDatabase()
+    private void LoadResourcesFromDatabase(KromicDbContext dbContext)
     {
         try
         {
-            if (_dbContext == null)
+            if (dbContext == null)
             {
                 _logger.LogWarning("DbContext is null, falling back to JSON files");
                 LoadResourcesFromJson();
                 return;
             }
 
-            var resources = _dbContext.LocalizationResources
+            var resources = dbContext.LocalizationResources
                 .AsNoTracking()
                 .ToList();
 

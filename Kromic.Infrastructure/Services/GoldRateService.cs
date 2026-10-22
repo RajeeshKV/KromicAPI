@@ -655,7 +655,7 @@ public sealed class GoldRateService(
         var result = snapshot is null ? null : ToResponse(snapshot);
         if (result is not null)
         {
-            _memoryCache.Set(key, result, TimeSpan.FromHours(1));
+            _memoryCache.Set(key, result, TimeSpan.MaxValue);
         }
         return result;
     }
@@ -674,7 +674,7 @@ public sealed class GoldRateService(
         var result = snapshot?.SilverRate;
         if (result.HasValue)
         {
-            _memoryCache.Set(key, result, TimeSpan.FromHours(1));
+            _memoryCache.Set(key, result, TimeSpan.MaxValue);
         }
         return result;
     }

@@ -217,6 +217,7 @@ public sealed class GoldRateService(
                 "Gold rate unchanged for {Date}. 22K: {GoldRate}. Skipping save and notifications.",
                 TimeZoneInfo.ConvertTime(fetchedAt, GetIndiaTimeZone()).Date,
                 data.R22KT);
+            _memoryCache.Set("gold:current", ToResponse(latestToday), TimeSpan.MaxValue);
             return new GoldRateFetchResponse(ToResponse(latestToday), RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
         }
 
@@ -246,7 +247,7 @@ public sealed class GoldRateService(
 
         dbContext.GoldRateSnapshots.Add(snapshot);
         await dbContext.SaveChangesAsync(cancellationToken);
-        _memoryCache.Remove("gold:current");
+        _memoryCache.Set("gold:current", ToResponse(snapshot), TimeSpan.MaxValue);
 
         // Store silver separately (decoupled) when present
         if (data.SilverRate.HasValue)

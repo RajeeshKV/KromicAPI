@@ -158,7 +158,7 @@ public sealed class GoldRateDailyWorker(
             if (dayOffset == 0)
             {
                 var failoverTime = new DateTime(date.Year, date.Month, date.Day, failoverTriggerHour, failoverTriggerMinute, 0);
-                if (now >= failoverTime)
+                if (now >= failoverTime && now < failoverTime.AddMinutes(5))
                 {
                     var failoverDelay = ToDelay(failoverTime);
                     if (failoverDelay <= TimeSpan.Zero)

@@ -3,6 +3,7 @@ using Kromic.Application.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 namespace Kromic.Infrastructure.Services;
@@ -10,9 +11,11 @@ namespace Kromic.Infrastructure.Services;
 public sealed class GoldRateDailyWorker(
     IServiceScopeFactory scopeFactory,
     IOptions<GoldRateOptions> options,
+    IMemoryCache memoryCache,
     ILogger<GoldRateDailyWorker> logger) : BackgroundService
 {
     private readonly GoldRateOptions _options = options.Value;
+    private readonly IMemoryCache _memoryCache = memoryCache;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -77,16 +80,18 @@ public sealed class GoldRateDailyWorker(
                 if (nextRun.IsFailover)
                 {
                     var hasSnapshot = await goldRateService.HasSnapshotForTodayAsync(stoppingToken);
-                    if (!hasSnapshot)
+                    var failoverRanToday = _memoryCache.TryGetValue($"failover:ran:{DateTime.UtcNow:yyyy-MM-dd}", out _);
+                    if (!hasSnapshot && !failoverRanToday)
                     {
                         await goldRateService.FetchFromBackupProvidersAsync(
                             sendRegularEmail: true,
                             sendLowestAlert: true,
                             stoppingToken);
+                        _memoryCache.Set($"failover:ran:{DateTime.UtcNow:yyyy-MM-dd}", true, TimeSpan.FromDays(1));
                     }
                     else
                     {
-                        logger.LogDebug("Failover skipped — today's snapshot already exists.");
+                        logger.LogDebug("Failover skipped — today's snapshot already exists or failover already ran.");
                     }
                 }
                 else if (nextRun.IsAkgsmaPreMarket)

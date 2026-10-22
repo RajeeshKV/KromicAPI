@@ -2,26 +2,37 @@ using Kromic.Application.Interfaces;
 using Kromic.Domain.Entities;
 using Kromic.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace Kromic.Infrastructure.Services;
 
 public sealed class UserSettingsService(
     KromicDbContext dbContext,
+    IMemoryCache memoryCache,
     ILogger<UserSettingsService> logger) : IUserSettingsService
 {
+    private readonly IMemoryCache _memoryCache = memoryCache;
     public async Task<Application.Interfaces.UserSettings?> GetByChatIdAsync(string chatId, CancellationToken cancellationToken)
     {
+        var key = $"usersettings:{chatId}";
+        if (_memoryCache.TryGetValue<Application.Interfaces.UserSettings?>(key, out var cached))
+        {
+            return cached;
+        }
         var entity = await dbContext.UserSettings
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.ChatId == chatId, cancellationToken);
 
         if (entity == null)
         {
+            _memoryCache.Set(key, (Application.Interfaces.UserSettings?)null, TimeSpan.FromHours(24));
             return null;
         }
 
-        return ToDto(entity);
+        var dto = ToDto(entity);
+        _memoryCache.Set(key, dto, TimeSpan.FromHours(24));
+        return dto;
     }
 
     public async Task<Application.Interfaces.UserSettings> GetOrCreateAsync(string chatId, CancellationToken cancellationToken)
@@ -47,6 +58,7 @@ public sealed class UserSettingsService(
 
         dbContext.UserSettings.Add(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
+        _memoryCache.Remove($"usersettings:{chatId}");
 
         logger.LogInformation("Created default settings for chat ID: {ChatId}", chatId);
 
@@ -59,6 +71,7 @@ public sealed class UserSettingsService(
         entity.Language = language;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
+        _memoryCache.Remove($"usersettings:{chatId}");
         logger.LogInformation("Updated language to {Language} for chat ID: {ChatId}", language, chatId);
     }
 
@@ -68,6 +81,7 @@ public sealed class UserSettingsService(
         entity.TelegramNotificationsEnabled = enabled;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
+        _memoryCache.Remove($"usersettings:{chatId}");
         logger.LogInformation("Set Telegram notifications to {Enabled} for chat ID: {ChatId}", enabled, chatId);
     }
 
@@ -77,6 +91,7 @@ public sealed class UserSettingsService(
         entity.EmailNotificationsEnabled = enabled;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
+        _memoryCache.Remove($"usersettings:{chatId}");
         logger.LogInformation("Set email notifications to {Enabled} for chat ID: {ChatId}", enabled, chatId);
     }
 
@@ -86,6 +101,7 @@ public sealed class UserSettingsService(
         entity.IsPaused = paused;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
+        _memoryCache.Remove($"usersettings:{chatId}");
         logger.LogInformation("Set paused state to {Paused} for chat ID: {ChatId}", paused, chatId);
     }
 
@@ -95,6 +111,7 @@ public sealed class UserSettingsService(
         entity.GoldNotificationsEnabled = enabled;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
+        _memoryCache.Remove($"usersettings:{chatId}");
         logger.LogInformation("Set gold notifications to {Enabled} for chat ID: {ChatId}", enabled, chatId);
     }
 
@@ -104,6 +121,7 @@ public sealed class UserSettingsService(
         entity.SilverNotificationsEnabled = enabled;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
+        _memoryCache.Remove($"usersettings:{chatId}");
         logger.LogInformation("Set silver notifications to {Enabled} for chat ID: {ChatId}", enabled, chatId);
     }
 

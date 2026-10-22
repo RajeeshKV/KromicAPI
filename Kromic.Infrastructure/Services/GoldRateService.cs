@@ -199,7 +199,7 @@ public sealed class GoldRateService(
         // Cache-first: if cached rate matches new rate, skip DB entirely
         var cachedRate = _memoryCache.TryGetValue<GoldRateSnapshotResponse>("gold:current", out var cached)
             && cached is not null && cached.R22KT == data.R22KT;
-        logger.LogDebug("Gold cache check: cached={HasCached}, cachedR22Kt={CachedR22Kt}, newR22Kt={NewR22Kt}, hit={Hit}",
+        logger.LogInformation("Gold cache check: cached={HasCached}, cachedR22Kt={CachedR22Kt}, newR22Kt={NewR22Kt}, hit={Hit}",
             cached is not null, cached?.R22KT, data.R22KT, cachedRate);
         if (cachedRate)
         {
@@ -221,7 +221,7 @@ public sealed class GoldRateService(
                 TimeZoneInfo.ConvertTime(fetchedAt, GetIndiaTimeZone()).Date,
                 data.R22KT);
             _memoryCache.Set("gold:current", ToResponse(latestToday));
-            logger.LogDebug("Gold cache set from DB snapshot: R22Kt={R22Kt}", latestToday.R22KT);
+            logger.LogInformation("Gold cache set from DB snapshot: R22Kt={R22Kt}", latestToday.R22KT);
             return new GoldRateFetchResponse(ToResponse(latestToday), RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
         }
 
@@ -252,7 +252,7 @@ public sealed class GoldRateService(
         dbContext.GoldRateSnapshots.Add(snapshot);
         await dbContext.SaveChangesAsync(cancellationToken);
         _memoryCache.Set("gold:current", ToResponse(snapshot));
-        logger.LogDebug("Gold cache set from new snapshot: R22Kt={R22Kt}", snapshot.R22KT);
+        logger.LogInformation("Gold cache set from new snapshot: R22Kt={R22Kt}", snapshot.R22KT);
 
         // Store silver separately (decoupled) when present
         if (data.SilverRate.HasValue)

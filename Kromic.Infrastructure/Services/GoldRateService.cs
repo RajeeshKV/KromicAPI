@@ -196,6 +196,13 @@ public sealed class GoldRateService(
         bool sendLowestAlert,
         CancellationToken cancellationToken)
     {
+        // Cache-first: if cached rate matches new rate, skip DB entirely
+        if (_memoryCache.TryGetValue<GoldRateSnapshotResponse>("gold:current", out var cached)
+            && cached is not null && cached.R22KT == data.R22KT)
+        {
+            return new GoldRateFetchResponse(cached, RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
+        }
+
         var fetchedAt = DateTimeOffset.UtcNow;
         var todayRange = GetIndiaDayRange(fetchedAt);
         var latestToday = await dbContext.GoldRateSnapshots

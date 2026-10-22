@@ -76,10 +76,18 @@ public sealed class GoldRateDailyWorker(
                 var goldRateService = scope.ServiceProvider.GetRequiredService<IGoldRateService>();
                 if (nextRun.IsFailover)
                 {
-                    await goldRateService.FetchFromBackupProvidersAsync(
-                        sendRegularEmail: true,
-                        sendLowestAlert: true,
-                        stoppingToken);
+                    var hasSnapshot = await goldRateService.HasSnapshotForTodayAsync(stoppingToken);
+                    if (!hasSnapshot)
+                    {
+                        await goldRateService.FetchFromBackupProvidersAsync(
+                            sendRegularEmail: true,
+                            sendLowestAlert: true,
+                            stoppingToken);
+                    }
+                    else
+                    {
+                        logger.LogDebug("Failover skipped — today's snapshot already exists.");
+                    }
                 }
                 else if (nextRun.IsAkgsmaPreMarket)
                 {

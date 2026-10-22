@@ -288,6 +288,7 @@ public sealed class GoldRateService(
 
         var fetchedAt = DateTimeOffset.UtcNow;
         var todayRange = GetIndiaDayRange(fetchedAt);
+        var latestToday = await dbContext.SilverRateSnapshots
             .Where(x => x.FetchedAt >= todayRange.StartUtc && x.FetchedAt < todayRange.EndUtc)
             .OrderByDescending(x => x.FetchedAt)
             .FirstOrDefaultAsync(cancellationToken);

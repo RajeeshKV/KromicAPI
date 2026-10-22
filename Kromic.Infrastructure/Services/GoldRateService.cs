@@ -279,15 +279,22 @@ public sealed class GoldRateService(
     }
     private async Task<bool> StoreSilverRateAsync(GoldRateApiData data, CancellationToken cancellationToken)
     {
+        // Cache-first for silver
+        if (_memoryCache.TryGetValue<decimal?>("silver:current", out var cachedSilver)
+            && cachedSilver.HasValue && data.SilverRate.HasValue && cachedSilver.Value == data.SilverRate.Value)
+        {
+            return false;
+        }
+
         var fetchedAt = DateTimeOffset.UtcNow;
         var todayRange = GetIndiaDayRange(fetchedAt);
-        var latestToday = await dbContext.SilverRateSnapshots
             .Where(x => x.FetchedAt >= todayRange.StartUtc && x.FetchedAt < todayRange.EndUtc)
             .OrderByDescending(x => x.FetchedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (latestToday is not null && latestToday.SilverRate == data.SilverRate.Value)
         {
+            _memoryCache.Set("silver:current", latestToday.SilverRate, TimeSpan.MaxValue);
             return false;
         }
 
@@ -300,7 +307,7 @@ public sealed class GoldRateService(
         };
         dbContext.SilverRateSnapshots.Add(snapshot);
         await dbContext.SaveChangesAsync(cancellationToken);
-        _memoryCache.Remove("silver:current");
+        _memoryCache.Set("silver:current", snapshot.SilverRate, TimeSpan.MaxValue);
         return true;
     }
 

@@ -3,19 +3,29 @@ using Kromic.Application.Interfaces;
 using Kromic.Domain.Entities;
 using Kromic.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace Kromic.Infrastructure.Services;
 
 public sealed class TelegramUserService(
     KromicDbContext dbContext,
+    IMemoryCache memoryCache,
     ILogger<TelegramUserService> logger) : ITelegramUserService
 {
+    private readonly IMemoryCache _memoryCache = memoryCache;
     public async Task<TelegramUser?> GetUserByChatIdAsync(string chatId, CancellationToken cancellationToken)
     {
-        return await dbContext.TelegramUsers
+        var key = $"telegramuser:{chatId}";
+        if (_memoryCache.TryGetValue<TelegramUser?>(key, out var cached))
+        {
+            return cached;
+        }
+        var entity = await dbContext.TelegramUsers
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.ChatId == chatId, cancellationToken);
+        _memoryCache.Set(key, entity, TimeSpan.MaxValue);
+        return entity;
     }
 
     public async Task<TelegramUser> AddOrUpdateUserAsync(
@@ -61,6 +71,7 @@ public sealed class TelegramUserService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        _memoryCache.Remove($"telegramuser:{chatId}");
         return existingUser;
     }
 

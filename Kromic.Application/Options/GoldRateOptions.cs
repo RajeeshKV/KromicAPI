@@ -2,7 +2,7 @@ namespace Kromic.Application.Options;
 
 public sealed class GoldRateOptions
 {
-    public string Endpoint { get; set; } = "https://akgsma.com/";
+    public string Endpoint { get; set; } = "https://www.goodreturns.in/gold-rates/kerala.html";
     public string RecipientEmail { get; set; } = string.Empty;
     public string RecipientEmailsCsv { get; set; } = string.Empty;
     public List<string> RecipientEmails { get; set; } = [];
@@ -12,7 +12,7 @@ public sealed class GoldRateOptions
     public int ScheduleStartHour { get; set; } = 10;
     public int ScheduleEndHour { get; set; } = 20;
     public int ScheduleIntervalMinutes { get; set; } = 5;
-    public bool AkgsmaPreMarketFetchEnabled { get; set; } = true;
+    public bool AkgsmaPreMarketFetchEnabled { get; set; } = false;
     public int AkgsmaPreMarketStartHour { get; set; } = 6;
     public int FailoverTriggerHour { get; set; } = 9;
     public int FailoverTriggerMinute { get; set; } = 30;

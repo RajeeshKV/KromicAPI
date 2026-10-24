@@ -40,10 +40,9 @@ public sealed class GoldRateDailyWorker(
                 endHour = 20;
             }
 
-            var akgsmaPreMarketStartHour = ResolveAkgsmaPreMarketStartHour(startHour);
             var failoverTriggerHour = NormalizeHour(_options.FailoverTriggerHour, fallback: 9);
             var failoverTriggerMinute = NormalizeInterval(_options.FailoverTriggerMinute, fallback: 30);
-            var nextRun = GetNextRun(startHour, endHour, intervalMinutes, akgsmaPreMarketStartHour, failoverTriggerHour, failoverTriggerMinute);
+            var nextRun = GetNextRun(startHour, endHour, intervalMinutes, failoverTriggerHour, failoverTriggerMinute);
             if (nextRun.IsFailover)
             {
                 logger.LogInformation(
@@ -51,15 +50,6 @@ public sealed class GoldRateDailyWorker(
                     nextRun.Delay,
                     failoverTriggerHour,
                     failoverTriggerMinute);
-            }
-            else if (nextRun.IsAkgsmaPreMarket)
-            {
-                logger.LogInformation(
-                    "Next AKGSMA pre-market gold rate fetch scheduled in {Delay}. Pre-market window: {PreMarketStartHour}:00-{StartHour}:00 IST, interval: {IntervalMinutes} minutes.",
-                    nextRun.Delay,
-                    akgsmaPreMarketStartHour,
-                    startHour,
-                    intervalMinutes);
             }
             else
             {
@@ -94,13 +84,6 @@ public sealed class GoldRateDailyWorker(
                         logger.LogDebug("Failover skipped — today's snapshot already exists or failover already ran.");
                     }
                 }
-                else if (nextRun.IsAkgsmaPreMarket)
-                {
-                    await goldRateService.FetchAkgsmaTodayAndStoreAsync(
-                        sendRegularEmail: true,
-                        sendLowestAlert: true,
-                        stoppingToken);
-                }
                 else
                 {
                     await goldRateService.FetchAndStoreAsync(
@@ -117,29 +100,15 @@ public sealed class GoldRateDailyWorker(
             {
                 logger.LogError(ex, nextRun.IsFailover
                     ? "Failover backup provider fetch failed."
-                    : nextRun.IsAkgsmaPreMarket
-                        ? "Scheduled AKGSMA pre-market gold rate fetch failed."
-                        : "Scheduled gold rate fetch failed.");
+                    : "Scheduled gold rate fetch failed.");
             }
         }
-    }
-
-    private int? ResolveAkgsmaPreMarketStartHour(int scheduleStartHour)
-    {
-        if (!_options.AkgsmaPreMarketFetchEnabled || !IsAkgsmaEndpoint(_options.Endpoint))
-        {
-            return null;
-        }
-
-        var preMarketStartHour = NormalizeHour(_options.AkgsmaPreMarketStartHour, fallback: 6);
-        return preMarketStartHour < scheduleStartHour ? preMarketStartHour : null;
     }
 
     private static ScheduledRun GetNextRun(
         int startHour,
         int endHour,
         int intervalMinutes,
-        int? akgsmaPreMarketStartHour,
         int failoverTriggerHour,
         int failoverTriggerMinute)
     {
@@ -165,21 +134,6 @@ public sealed class GoldRateDailyWorker(
                     {
                         return new ScheduledRun(TimeSpan.Zero, IsAkgsmaPreMarket: false, IsFailover: true);
                     }
-                }
-            }
-
-            if (akgsmaPreMarketStartHour.HasValue)
-            {
-                var preMarketRun = GetNextRunInWindow(
-                    now,
-                    date,
-                    akgsmaPreMarketStartHour.Value,
-                    startHour,
-                    intervalMinutes,
-                    includeEndHour: false);
-                if (preMarketRun.HasValue)
-                {
-                    return new ScheduledRun(ToDelay(preMarketRun.Value), IsAkgsmaPreMarket: true, IsFailover: false);
                 }
             }
 
@@ -266,10 +220,6 @@ public sealed class GoldRateDailyWorker(
 
     private static int NormalizeInterval(int intervalMinutes, int fallback) =>
         intervalMinutes is >= 1 and <= 60 ? intervalMinutes : fallback;
-
-    private static bool IsAkgsmaEndpoint(string endpoint) =>
-        Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) &&
-        uri.Host.Contains("akgsma.com", StringComparison.OrdinalIgnoreCase);
 
     private static TimeZoneInfo GetIndiaTimeZone()
     {

@@ -12,6 +12,7 @@ public sealed class GoldRateOptions
     public int ScheduleStartHour { get; set; } = 10;
     public int ScheduleEndHour { get; set; } = 20;
     public int ScheduleIntervalMinutes { get; set; } = 5;
+    public decimal MinRateChangeForNotification { get; set; } = 1m;
     public bool AkgsmaPreMarketFetchEnabled { get; set; } = false;
     public int AkgsmaPreMarketStartHour { get; set; } = 6;
     public int FailoverTriggerHour { get; set; } = 9;

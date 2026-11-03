@@ -214,6 +214,9 @@ public sealed class GoldRateService(
         var goldChanged = latestToday == null || latestToday.R22KT != data.R22KT;
         var silverChanged = false;
 
+        var significantGoldChange = latestToday is null
+            || Math.Abs(data.R22KT - latestToday.R22KT) > _options.MinRateChangeForNotification;
+
         var isLowest = previousLowest.HasValue && data.R22KT < previousLowest.Value;
         var snapshot = new GoldRateSnapshot
         {
@@ -245,8 +248,8 @@ public sealed class GoldRateService(
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        // Telegram: whenever gold or silver changed
-        if (goldChanged || silverChanged)
+        // Telegram: whenever gold changed significantly or silver changed
+        if (significantGoldChange || silverChanged)
         {
             await SendRateTelegramAsync(snapshot, isLowestAlert: false, goldChanged, silverChanged, cancellationToken);
         }

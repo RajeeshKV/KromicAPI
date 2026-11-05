@@ -42,7 +42,11 @@ public sealed class GoldRateDailyWorker(
 
             var failoverTriggerHour = NormalizeHour(_options.FailoverTriggerHour, fallback: 9);
             var failoverTriggerMinute = NormalizeInterval(_options.FailoverTriggerMinute, fallback: 30);
-            var nextRun = GetNextRun(startHour, endHour, intervalMinutes, failoverTriggerHour, failoverTriggerMinute);
+
+            var dateKey = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            var failoverAlreadyHandled = _memoryCache.TryGetValue($"failover:checked:{dateKey}", out _);
+
+            var nextRun = GetNextRun(startHour, endHour, intervalMinutes, failoverTriggerHour, failoverTriggerMinute, failoverAlreadyHandled);
             if (nextRun.IsFailover)
             {
                 logger.LogInformation(
@@ -69,20 +73,28 @@ public sealed class GoldRateDailyWorker(
                 var goldRateService = scope.ServiceProvider.GetRequiredService<IGoldRateService>();
                 if (nextRun.IsFailover)
                 {
-                    var hasSnapshot = await goldRateService.HasSnapshotForTodayAsync(stoppingToken);
-                    var failoverRanToday = _memoryCache.TryGetValue($"failover:ran:{DateTime.UtcNow:yyyy-MM-dd}", out _);
-                    if (!hasSnapshot && !failoverRanToday)
+                    var failoverRanToday = _memoryCache.TryGetValue($"failover:ran:{dateKey}", out _);
+                    if (!failoverRanToday)
                     {
-                        await goldRateService.FetchFromBackupProvidersAsync(
-                            sendRegularEmail: true,
-                            sendLowestAlert: true,
-                            stoppingToken);
-                        _memoryCache.Set($"failover:ran:{DateTime.UtcNow:yyyy-MM-dd}", true, TimeSpan.FromDays(1));
+                        var hasSnapshot = await goldRateService.HasSnapshotForTodayAsync(stoppingToken);
+                        if (!hasSnapshot)
+                        {
+                            await goldRateService.FetchFromBackupProvidersAsync(
+                                sendRegularEmail: true,
+                                sendLowestAlert: true,
+                                stoppingToken);
+                            _memoryCache.Set($"failover:ran:{dateKey}", true, TimeSpan.FromDays(1));
+                        }
+                        else
+                        {
+                            logger.LogDebug("Failover skipped — today's snapshot already exists.");
+                        }
                     }
                     else
                     {
-                        logger.LogDebug("Failover skipped — today's snapshot already exists or failover already ran.");
+                        logger.LogDebug("Failover skipped — failover already ran today.");
                     }
+                    _memoryCache.Set($"failover:checked:{dateKey}", true, TimeSpan.FromDays(1));
                 }
                 else
                 {
@@ -110,7 +122,8 @@ public sealed class GoldRateDailyWorker(
         int endHour,
         int intervalMinutes,
         int failoverTriggerHour,
-        int failoverTriggerMinute)
+        int failoverTriggerMinute,
+        bool failoverAlreadyHandled)
     {
         var indiaTimeZone = GetIndiaTimeZone();
         var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, indiaTimeZone);
@@ -124,7 +137,7 @@ public sealed class GoldRateDailyWorker(
             }
 
             // Failover trigger: if past 09:30 IST and no snapshot yet, schedule failover
-            if (dayOffset == 0)
+            if (dayOffset == 0 && !failoverAlreadyHandled)
             {
                 var failoverTime = new DateTime(date.Year, date.Month, date.Day, failoverTriggerHour, failoverTriggerMinute, 0);
                 if (now >= failoverTime && now < failoverTime.AddMinutes(5))

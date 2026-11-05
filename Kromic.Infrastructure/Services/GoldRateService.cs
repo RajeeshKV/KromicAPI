@@ -174,48 +174,41 @@ public sealed class GoldRateService(
         bool sendLowestAlert,
         CancellationToken cancellationToken)
     {
-        // Cache-first: if cached rate matches new rate, skip DB entirely
-        var cachedRate = _memoryCache.TryGetValue<GoldRateSnapshotResponse>("gold:current", out var cached)
-            && cached is not null && cached.R22KT == data.R22KT;
-        logger.LogDebug("Gold cache check: cached={HasCached}, cachedR22Kt={CachedR22Kt}, newR22Kt={NewR22Kt}, hit={Hit}",
-            cached is not null, cached?.R22KT, data.R22KT, cachedRate);
-        if (cachedRate)
+        // Cache-first: if cached rate is within threshold of new rate, skip DB entirely
+        if (_memoryCache.TryGetValue<GoldRateSnapshotResponse>("gold:current", out var cached)
+            && cached is not null
+            && Math.Abs(data.R22KT - cached.R22KT) <= _options.MinRateChangeForNotification)
         {
             return new GoldRateFetchResponse(cached, RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
         }
 
-        var fetchedAt = DateTimeOffset.UtcNow;
-        var todayRange = GetIndiaDayRange(fetchedAt);
-        var latestToday = await dbContext.GoldRateSnapshots
-            .Where(x => x.FetchedAt >= todayRange.StartUtc && x.FetchedAt < todayRange.EndUtc)
-            .OrderByDescending(x => x.FetchedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        // Skip if gold rate unchanged (silver is tracked separately)
-        if (latestToday is not null && latestToday.R22KT == data.R22KT)
+        // Cache empty (cold start): initialize from DB once, then compare
+        if (cached is null)
         {
-            logger.LogInformation(
-                "Gold rate unchanged for {Date}. 22K: {GoldRate}. Skipping save and notifications.",
-                TimeZoneInfo.ConvertTime(fetchedAt, GetIndiaTimeZone()).Date,
-                data.R22KT);
-            _memoryCache.Set("gold:current", ToResponse(latestToday));
-            logger.LogDebug("Gold cache set from DB snapshot: R22Kt={R22Kt}", latestToday.R22KT);
-            return new GoldRateFetchResponse(ToResponse(latestToday), RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
+            var fetchedAt = DateTimeOffset.UtcNow;
+            var todayRange = GetIndiaDayRange(fetchedAt);
+            var latestToday = await dbContext.GoldRateSnapshots
+                .Where(x => x.FetchedAt >= todayRange.StartUtc && x.FetchedAt < todayRange.EndUtc)
+                .OrderByDescending(x => x.FetchedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (latestToday is not null && Math.Abs(data.R22KT - latestToday.R22KT) <= _options.MinRateChangeForNotification)
+            {
+                _memoryCache.Set("gold:current", ToResponse(latestToday));
+                return new GoldRateFetchResponse(ToResponse(latestToday), RegularEmailSent: false, LowestAlertSent: false, RateChanged: false);
+            }
+
+            if (latestToday is not null)
+            {
+                _memoryCache.Set("gold:current", ToResponse(latestToday));
+            }
         }
 
+        // Significant change detected (> threshold): write to DB and notify
+        var writeAt = DateTimeOffset.UtcNow;
         var previousLowest = await dbContext.GoldRateSnapshots
             .AsNoTracking()
             .MinAsync(x => (decimal?)x.R22KT, cancellationToken);
-
-        // Track what actually changed for selective notifications.
-        // Silver is only "changed" when both the previous and current values are real numbers
-        // and they differ. A null result (e.g. backup provider that has no silver data) is
-        // treated as "no data" — never as a change that warrants a notification.
-        var goldChanged = latestToday == null || latestToday.R22KT != data.R22KT;
-        var silverChanged = false;
-
-        var significantGoldChange = latestToday is null
-            || Math.Abs(data.R22KT - latestToday.R22KT) > _options.MinRateChangeForNotification;
 
         var isLowest = previousLowest.HasValue && data.R22KT < previousLowest.Value;
         var snapshot = new GoldRateSnapshot
@@ -226,33 +219,30 @@ public sealed class GoldRateService(
             R18KT = data.R18KT,
             R24KT = data.R24KT,
             SourceLastUpdatedAt = ParseIndiaDateTime(data.LastUpdated),
-            FetchedAt = fetchedAt,
+            FetchedAt = writeAt,
             IsLowestAtFetch = isLowest
         };
 
         dbContext.GoldRateSnapshots.Add(snapshot);
         await dbContext.SaveChangesAsync(cancellationToken);
         _memoryCache.Set("gold:current", ToResponse(snapshot));
-        logger.LogDebug("Gold cache set from new snapshot: R22Kt={R22Kt}", snapshot.R22KT);
 
         // Store silver separately (decoupled) when present
+        var silverChanged = false;
         if (data.SilverRate.HasValue)
         {
             silverChanged = await StoreSilverRateAsync(data, cancellationToken);
         }
 
-        // Email: only when gold changed
-        if (sendRegularEmail && goldChanged)
+        // Email: only when gold changed significantly
+        if (sendRegularEmail)
         {
             snapshot.RegularEmailMessageId = await SendRateEmailAsync(snapshot, isLowestAlert: false, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        // Telegram: whenever gold changed significantly or silver changed
-        if (significantGoldChange || silverChanged)
-        {
-            await SendRateTelegramAsync(snapshot, isLowestAlert: false, goldChanged, silverChanged, cancellationToken);
-        }
+        // Telegram: only when gold changed significantly or silver changed
+        await SendRateTelegramAsync(snapshot, isLowestAlert: false, goldChanged: true, silverChanged, cancellationToken);
 
         if (sendLowestAlert && isLowest)
         {
@@ -261,7 +251,7 @@ public sealed class GoldRateService(
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return new GoldRateFetchResponse(ToResponse(snapshot), sendRegularEmail && goldChanged, sendLowestAlert && isLowest, RateChanged: goldChanged || silverChanged);
+        return new GoldRateFetchResponse(ToResponse(snapshot), sendRegularEmail, sendLowestAlert && isLowest, RateChanged: true);
     }
     private async Task<bool> StoreSilverRateAsync(GoldRateApiData data, CancellationToken cancellationToken)
     {

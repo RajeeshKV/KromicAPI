@@ -13,6 +13,9 @@ public sealed class TelegramUserService(
     IMemoryCache memoryCache,
     ILogger<TelegramUserService> logger) : ITelegramUserService
 {
+    private const string ActiveChatIdsCacheKey = "telegram:activechatids";
+    private const string ActiveChatCountCacheKey = "telegram:activechatcount";
+
     private readonly IMemoryCache _memoryCache = memoryCache;
     public async Task<TelegramUser?> GetUserByChatIdAsync(string chatId, CancellationToken cancellationToken)
     {
@@ -72,24 +75,60 @@ public sealed class TelegramUserService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         _memoryCache.Remove($"telegramuser:{chatId}");
+        InvalidateActiveUserCache();
         return existingUser;
     }
 
     public async Task<List<string>> GetActiveChatIdsAsync(CancellationToken cancellationToken)
     {
-        return await dbContext.TelegramUsers
+        if (_memoryCache.TryGetValue<List<string>>(ActiveChatIdsCacheKey, out var cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        var chatIds = await dbContext.TelegramUsers
             .AsNoTracking()
             .Where(x => x.IsActive)
             .OrderBy(x => x.CreatedAt)
             .Select(x => x.ChatId)
             .ToListAsync(cancellationToken);
+
+        _memoryCache.Set(ActiveChatIdsCacheKey, chatIds);
+
+        if (chatIds.Count == 0)
+        {
+            logger.LogWarning(
+                "Resolved 0 active Telegram chat IDs from database. No rate notifications will be delivered until a user starts the bot or TelegramChatIds is configured. Cached until a user is added.");
+        }
+        else
+        {
+            logger.LogDebug(
+                "Resolved {ChatIdCount} active Telegram chat IDs from database (cached until a user is added or removed).",
+                chatIds.Count);
+        }
+
+        return chatIds;
     }
 
     public async Task<int> GetActiveChatCountAsync(CancellationToken cancellationToken)
     {
-        return await dbContext.TelegramUsers
+        if (_memoryCache.TryGetValue<int>(ActiveChatCountCacheKey, out var cached))
+        {
+            return cached;
+        }
+
+        var count = await dbContext.TelegramUsers
             .AsNoTracking()
             .CountAsync(x => x.IsActive, cancellationToken);
+
+        _memoryCache.Set(ActiveChatCountCacheKey, count);
+        return count;
+    }
+
+    private void InvalidateActiveUserCache()
+    {
+        _memoryCache.Remove(ActiveChatIdsCacheKey);
+        _memoryCache.Remove(ActiveChatCountCacheKey);
     }
     public async Task<IReadOnlyList<TelegramBotUserResponse>> GetUsersWithEmailSubscriptionsAsync(CancellationToken cancellationToken)
     {

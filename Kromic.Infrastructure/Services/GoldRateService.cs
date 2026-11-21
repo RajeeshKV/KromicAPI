@@ -234,21 +234,39 @@ public sealed class GoldRateService(
             silverChanged = await StoreSilverRateAsync(data, cancellationToken);
         }
 
-        // Email: only when gold changed significantly
+        // Telegram: only when gold changed significantly or silver changed.
+        // Sent before email bookkeeping so a DbContext failure never blocks Telegram.
+        await SendRateTelegramAsync(snapshot, isLowestAlert: false, goldChanged: true, silverChanged, cancellationToken);
+
+        // Email: only when gold changed significantly.
+        // Kept non-fatal: a send or bookkeeping failure must never block Telegram.
         if (sendRegularEmail)
         {
-            snapshot.RegularEmailMessageId = await SendRateEmailAsync(snapshot, isLowestAlert: false, cancellationToken);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            try
+            {
+                snapshot.RegularEmailMessageId = await SendRateEmailAsync(snapshot, isLowestAlert: false, cancellationToken);
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "Failed to send or record the regular gold rate email.");
+                dbContext.ChangeTracker.Clear();
+            }
         }
-
-        // Telegram: only when gold changed significantly or silver changed
-        await SendRateTelegramAsync(snapshot, isLowestAlert: false, goldChanged: true, silverChanged, cancellationToken);
 
         if (sendLowestAlert && isLowest)
         {
-            snapshot.LowestAlertMessageId = await SendRateEmailAsync(snapshot, isLowestAlert: true, cancellationToken);
-            await SendRateTelegramAsync(snapshot, isLowestAlert: true, goldChanged: true, silverChanged: false, cancellationToken);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            try
+            {
+                snapshot.LowestAlertMessageId = await SendRateEmailAsync(snapshot, isLowestAlert: true, cancellationToken);
+                await SendRateTelegramAsync(snapshot, isLowestAlert: true, goldChanged: true, silverChanged: false, cancellationToken);
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "Failed to send the lowest gold rate alert — continuing.");
+                dbContext.ChangeTracker.Clear();
+            }
         }
 
         return new GoldRateFetchResponse(ToResponse(snapshot), sendRegularEmail, sendLowestAlert && isLowest, RateChanged: true);
@@ -752,7 +770,17 @@ public sealed class GoldRateService(
             }
         }
 
-        return messageIds.Count == 0 ? null : string.Join(",", messageIds);
+        if (messageIds.Count == 0)
+        {
+            return null;
+        }
+
+        var joined = string.Join(",", messageIds);
+
+        // Both message-id columns are varchar(200). With many recipients the joined list
+        // overflows and the bookkeeping UPDATE fails (22001), which previously aborted
+        // the pipeline before the Telegram notification was sent.
+        return joined.Length > 200 ? joined[..200] : joined;
     }
 
     private string? BuildUnsubscribeUrl(string token)
